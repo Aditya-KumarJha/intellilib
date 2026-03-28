@@ -17,6 +17,7 @@ interface ThemeToggleAnimationProps {
   start?: AnimationStart
   showLabel?: boolean
   url?: string
+  className?: string
 }
 
 export default function ThemeToggleButton({
@@ -24,6 +25,7 @@ export default function ThemeToggleButton({
   start = "top-left",
   showLabel = false,
   url = "",
+  className,
 }: ThemeToggleAnimationProps) {
   const { resolvedTheme, setTheme } = useTheme()
 
@@ -68,7 +70,9 @@ export default function ThemeToggleButton({
       onClick={toggleTheme}
       variant="ghost"
       size="icon"
-      className="w-9 p-0 h-9 relative group"
+      className={`w-9 h-9 p-0 relative group rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md hover:bg-white/20 ${
+        className ?? ""
+      }`}
       name="Theme Toggle Button"
     >
       <SunIcon className="size-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
