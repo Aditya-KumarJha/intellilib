@@ -70,7 +70,7 @@
     font-family: 'ICA Rubrik';
     font-size: 16em;
     line-height: 1em;
-    color: #25283B;
+    color: var(--banner-title);
     position: relative;
 }
 
@@ -79,7 +79,7 @@
     inset: 0 0 0 0;
     content: attr(data-content);
     z-index: 2;
-    -webkit-text-stroke: 2px #d2d2d2;
+    -webkit-text-stroke: 2px var(--banner-stroke);
     color: transparent;
 }
 
@@ -87,6 +87,7 @@
     font-family: Poppins;
     text-align: right;
     max-width: 200px;
+    color: var(--banner-author);
 }
 
 .banner .content h2{
@@ -105,7 +106,7 @@
     background-position: top center;
     z-index: 1;
     opacity: 0.9;
-    filter: drop-shadow(0 20px 40px rgba(0,0,0,0.3));
+    filter: drop-shadow(0 20px 40px var(--banner-model-shadow));
 }
 
 @media screen and (max-width: 1023px){
@@ -124,14 +125,13 @@
     .banner .content h1{
         text-align: center;
         width: 100%;
-        text-shadow: 0 10px 20px #000;
+        text-shadow: 0 10px 20px var(--banner-shadow);
         font-size: 7em;
     }
 
     .banner .content .author{
-        color: #fff;
         padding: 20px;
-        text-shadow: 0 10px 20px #000;
+        text-shadow: 0 10px 20px var(--banner-shadow);
         z-index: 2;
         max-width: unset;
         width: 100%;

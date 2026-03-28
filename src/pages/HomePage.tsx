@@ -5,7 +5,9 @@ const HomePage = () => {
   return (
     <div>
       <Navbar />
-      <HeroSlider />
+      <div className="mt-20">
+        <HeroSlider />
+      </div>
     </div>
   );
 };

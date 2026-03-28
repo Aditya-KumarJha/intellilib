@@ -1,8 +1,27 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --page-bg: linear-gradient(180deg, #f3f4f6 0%, #ffffff 55%, #f5f5f5 100%);
+  --banner-title: #25283b;
+  --banner-stroke: #b7bccd;
+  --banner-author: #1f2937;
+  --banner-shadow: rgba(0, 0, 0, 0.25);
+  --banner-model-shadow: rgba(0, 0, 0, 0.25);
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --page-bg: linear-gradient(180deg, #0b0b10 0%, #050505 60%, #000000 100%);
+  --banner-title: #dfe3ff;
+  --banner-stroke: #6d738c;
+  --banner-author: #e5e7eb;
+  --banner-shadow: rgba(0, 0, 0, 0.6);
+  --banner-model-shadow: rgba(0, 0, 0, 0.5);
 }
 
 @theme inline {
@@ -12,15 +31,8 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
+  background: var(--page-bg);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
