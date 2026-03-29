@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import "../../styles/style.css";
 
 const images = [
   "/images/heroSlider/book-1.jpeg",
@@ -24,7 +23,7 @@ export default function HeroSlider() {
           <div
             key={index}
             className="item"
-            style={{ ["--position" as any]: index + 1 }}
+            style={{ ["--position" as any]: index + 1, position: "absolute" }}
           >
             <Image
               src={src}

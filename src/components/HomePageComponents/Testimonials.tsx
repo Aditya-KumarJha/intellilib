@@ -72,7 +72,7 @@ export default function SuccessStories() {
           Experience IntelliLib
         </h2>
 
-        <p className="text-muted-foreground mb-4">
+        <p className="text-foreground mb-4">
           From AI-powered discovery to seamless book management and payments, <br className="hidden md:block" />
           explore how IntelliLib transforms traditional libraries into intelligent systems.
         </p>
@@ -89,7 +89,7 @@ export default function SuccessStories() {
           <h3 className="text-foreground font-semibold mb-2">
             {stories[hoveredIndex].title}
           </h3>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-lg text-foreground">
             {stories[hoveredIndex].description}
           </p>
         </div>

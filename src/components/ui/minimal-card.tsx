@@ -25,8 +25,8 @@ MinimalCard.displayName = "MinimalCard";
 
 const MinimalCardImage = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { src: string; alt: string }
->(({ className, alt, src, ...props }, ref) => {
+  React.HTMLAttributes<HTMLDivElement> & { src: string; alt: string; loading?: "eager" | "lazy" }
+>(({ className, alt, src, loading, ...props }, ref) => {
   const isGif = src.toLowerCase().endsWith(".gif");
 
   return (
@@ -45,6 +45,7 @@ const MinimalCardImage = React.forwardRef<
         alt={alt}
         width={200}
         height={200}
+        loading={loading}
         unoptimized={isGif} 
         className="absolute inset-0 w-full h-full rounded-2xl object-cover"
       />

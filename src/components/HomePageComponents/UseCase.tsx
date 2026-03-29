@@ -48,6 +48,7 @@ const UseCase = () => {
                   className="h-45 w-full object-cover rounded-t-2xl"
                   src={card.src}
                   alt={card.alt}
+                  loading={key === 1 ? "eager" : "lazy"}
                 />
                 <MinimalCardTitle className="group-hover:text-neutral-900 dark:group-hover:text-white">
                   {card.title}
