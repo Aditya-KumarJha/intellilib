@@ -2,6 +2,7 @@ import HeroSlider from "@/components/HomePageComponents/HeroSlider";
 import UseCase from "@/components/HomePageComponents/UseCase";
 import AiSmartDiscovery from "@/components/HomePageComponents/AiSmartDiscovery";
 import Navbar from "@/components/common/Navbar";
+import Testimonials from "@/components/HomePageComponents/Testimonials";
 
 const HomePage = () => {
   return (
@@ -10,6 +11,7 @@ const HomePage = () => {
       <HeroSlider />
       <UseCase />
       <AiSmartDiscovery />
+      <Testimonials />
     </div>
   );
 };
