@@ -66,7 +66,7 @@ export default function Navbar() {
           className={`hidden md:flex items-center gap-2 px-3 py-1 rounded-full border transition-all duration-500
           ${
             scrolled
-              ? "bg-white/10 border-white/30 backdrop-blur-md"
+              ? "bg-black/10 border-white/30 backdrop-blur-md"
               : "bg-white/5 border-white/20"
           }`}
         >
@@ -106,7 +106,13 @@ export default function Navbar() {
 
         {/* Right - Auth Buttons */}
         <div className={`hidden md:flex items-center gap-3 ${scrolledTextClass}`}>
-          <ThemeToggleButton className={scrolled ? "text-black dark:text-white" : ""} />
+          <ThemeToggleButton
+            className={
+              scrolled
+                ? "bg-black/10 border-black/20 text-black dark:bg-white/10 dark:border-white/20 dark:text-white"
+                : ""
+            }
+          />
           <Button
             text="Login"
             icon={<LogIn size={16} />}
@@ -124,7 +130,13 @@ export default function Navbar() {
 
         {/* Mobile - Theme + Hamburger */}
         <div className={`flex items-center gap-2 md:hidden ${scrolledTextClass}`}>
-          <ThemeToggleButton className={scrolled ? "text-black dark:text-white" : ""} />
+          <ThemeToggleButton
+            className={
+              scrolled
+                ? "bg-black/10 border-black/20 text-black dark:bg-white/10 dark:border-white/20 dark:text-white"
+                : ""
+            }
+          />
           <button
             type="button"
             onClick={() => setMenuOpen((prev) => !prev)}

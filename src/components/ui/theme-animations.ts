@@ -76,6 +76,7 @@ export const createAnimation = (
             
       ::view-transition-new(root) {
         animation-name: reveal-light;
+        animation-fill-mode: both;
       }
 
       ::view-transition-old(root),
@@ -85,6 +86,7 @@ export const createAnimation = (
       }
       .dark::view-transition-new(root) {
         animation-name: reveal-dark;
+        animation-fill-mode: both;
       }
 
       @keyframes reveal-dark {
@@ -118,6 +120,7 @@ export const createAnimation = (
             
       ::view-transition-new(root) {
         animation-name: reveal-light;
+        animation-fill-mode: both;
       }
 
       ::view-transition-old(root),
@@ -127,6 +130,7 @@ export const createAnimation = (
       }
       .dark::view-transition-new(root) {
         animation-name: reveal-dark;
+        animation-fill-mode: both;
       }
 
       @keyframes reveal-dark {
@@ -160,11 +164,13 @@ export const createAnimation = (
 ::view-transition-new(root) {
   mask: url('${url}') center / 0 no-repeat;
   animation: scale 3s;
+  animation-fill-mode: both;
 }
 
 ::view-transition-old(root),
 .dark::view-transition-old(root) {
   animation: scale 3s;
+  animation-fill-mode: both;
 }
 
 @keyframes scale {
@@ -195,12 +201,14 @@ export const createAnimation = (
         mask-origin: content-box;
         animation: scale-${start} 1s;
         transform-origin: ${transformOrigin};
+        animation-fill-mode: both;
       }
       ::view-transition-old(root),
       .dark::view-transition-old(root) {
         animation: scale-${start} 1s;
         transform-origin: ${transformOrigin};
         z-index: -1;
+        animation-fill-mode: both;
       }
       @keyframes scale-${start} {
         to {

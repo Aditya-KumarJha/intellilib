@@ -20,20 +20,20 @@ const UseCase = () => {
       title: "For Librarians",
       description:
         "Manage books, users, and transactions with real-time tracking and analytics.",
-      src: "/images/giphy/giphy-1.gif",
+      src: "/images/giphy/giphy-2.gif",
       alt: "A librarian managing library operations through a dashboard",
     },
     {
       title: "Smart Library",
       description:
         "AI recommendations, automated fines, and seamless digital payments.",
-      src: "/images/giphy/giphy-1.gif",
+      src: "/images/giphy/giphy-3.gif",
       alt: "An AI-powered library system with smart features and payments",
     },
   ];
 
   return (
-    <div className="py-10">
+    <div className="py-10 lg:pt-20 lg:pb-10">
       <div className="sm:w-[90%] md:w-full lg:w-[75%] rounded-3xl shadow mx-auto">
         <div className="p-6 rounded-3xl mx-auto border border-neutral-200/70 bg-white/70 shadow-sm backdrop-blur dark:border-neutral-700/70 dark:bg-neutral-900/60">
           <BadgeButton>Use Cases</BadgeButton>
