@@ -269,72 +269,208 @@ section {
   width: 100dvw;
 }
 
-@layer utilities {
-  .flex-center {
-    @apply flex justify-center items-center;
-  }
+.flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-@layer components {
-  .section-padding {
-    @apply px-5 mt-20;
+.section-padding {
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+  margin-top: 5rem;
+}
+
+.contact-section {
+  margin-top: 2.5rem;
+}
+
+.grid-12-cols {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 2.5rem;
+}
+
+.cta-button {
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background-color: #323447;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.cta-button:hover {
+  background-color: #3b3e54;
+}
+
+.dark .cta-button {
+  background-color: var(--color-black-200);
+}
+
+.dark .cta-button:hover {
+  background-color: var(--color-black-200);
+}
+
+.cta-button .bg-circle {
+  position: absolute;
+  right: -2.5rem;
+  transform-origin: center;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 120%;
+  height: 120%;
+  border-radius: 9999px;
+  background-color: var(--color-white-50);
+  transition: all 500ms;
+}
+
+.cta-button:hover .bg-circle {
+  width: 2.5rem;
+  height: 2.5rem;
+  right: 2.5rem;
+}
+
+.cta-button .text {
+  text-transform: uppercase;
+  color: #000;
+  transition: all 500ms;
+  transform: translateX(-1.25rem);
+}
+
+.cta-button:hover .text {
+  color: var(--color-white-50);
+  transform: translateX(-1.25rem);
+}
+
+.cta-button .arrow-wrapper {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  position: absolute;
+  right: 2.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.cta-button:hover .arrow-wrapper {
+  background-color: var(--color-white-50);
+}
+
+.cta-button .arrow-wrapper img {
+  width: 1.25rem;
+  height: 1.25rem;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(0.5rem);
+  transition: opacity 300ms ease, transform 300ms ease;
+}
+
+.cta-button:hover .arrow-wrapper img {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  animation: cta-bounce 1s infinite;
+}
+
+.card-border {
+  border: 1px solid var(--color-black-50);
+  background-color: var(--color-black-100);
+}
+
+form label {
+  display: block;
+  color: #000;
+  margin-bottom: 0.5rem;
+}
+
+.dark form label {
+  color: var(--color-white-50);
+}
+
+form input,
+form textarea {
+  width: 100%;
+  padding: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  background-color: rgb(241 245 249);
+  border-radius: 0.375rem;
+  color: #000;
+  resize: vertical;
+  outline: none;
+}
+
+form input::placeholder,
+form textarea::placeholder {
+  color: #000;
+  opacity: 1;
+}
+
+.dark form input,
+.dark form textarea {
+  background-color: var(--color-blue-100);
+  color: var(--color-white-50);
+}
+
+.dark form input::placeholder,
+.dark form textarea::placeholder {
+  color: var(--color-blue-50);
+}
+
+@keyframes cta-bounce {
+  0%,
+  100% {
+    transform: translateY(-25%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
   }
-
-  .grid-12-cols {
-    @apply grid grid-cols-1 xl:grid-cols-12 gap-10;
-  }
-
-  .cta-button {
-    @apply px-4 py-4 rounded-lg bg-black-200 flex justify-center items-center relative cursor-pointer overflow-hidden;
-
-    .bg-circle {
-      @apply absolute -right-10 origin-center top-1/2 -translate-y-1/2 
-				w-[120%] h-[120%] group-hover:size-10 group-hover:right-10
-				rounded-full bg-white-50 transition-all duration-500;
-    }
-
-    .text {
-      @apply uppercase text-black transition-all duration-500
-				group-hover:text-white-50 group-hover:-translate-x-5 xl:translate-x-0 -translate-x-5;
-    }
-
-    .arrow-wrapper {
-      @apply group-hover:bg-white-50 size-10 rounded-full absolute right-10 top-1/2 
-				-translate-y-1/2 flex justify-center items-center overflow-hidden;
-
-      img {
-        @apply size-5 xl:-translate-y-32 translate-y-0 animate-bounce group-hover:translate-y-0 transition-all duration-500;
-      }
-    }
-  }
-
-  .card-border {
-    @apply border border-black-50 bg-black-100;
-  }
-
-  form {
-    label {
-      @apply block text-white-50 mb-2;
-    }
-
-    input,
-    textarea {
-      @apply w-full px-4 py-4 text-sm placeholder:text-blue-50 bg-blue-100 rounded-md;
-    }
+  50% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
   }
 }
 
 @media (min-width: 768px) {
   .section-padding {
-    @apply px-10 mt-40;
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+    margin-top: 10rem;
+  }
+
+  .contact-section {
+    margin-top: 4rem;
   }
 
   .cta-button .text {
-    @apply text-lg;
+    font-size: 1.125rem;
+    line-height: 1.75rem;
   }
 
   form input,
   form textarea {
-    @apply text-base;
+    font-size: 1rem;
+    line-height: 1.5rem;
   }
+}
+
+@media (min-width: 1280px) {
+  .grid-12-cols {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .cta-button .text {
+    transform: translateX(0);
+  }
+
+  .cta-button:hover .text {
+    transform: translateX(-1.25rem);
+  }
+
 }

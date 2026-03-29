@@ -63,15 +63,15 @@ const Contact = () => {
   };
 
   return (
-    <section id="contact" className="flex-center section-padding">
+    <section id="contact" className="flex-center section-padding contact-section">
       <div className="h-full w-full px-5 md:px-10">
         <TitleHeader
-          title="Get in Touch – Let’s Connect"
-          sub="💬 Have questions or ideas? Let’s talk! 🚀"
+          title="Request books, explore features, get help"
+          sub="Have a question or book request?"
         />
         <div className="grid-12-cols mt-16">
           <div className="xl:col-span-5">
-            <div className="flex-center rounded-xl p-10 border border-4 border-(--ai-card-border) bg-(--ai-card-bg) shadow-[0_25px_80px_-55px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
+            <div className="flex-center rounded-xl p-10 border-4 border-(--ai-card-border) bg-(--ai-card-bg) shadow-[0_25px_80px_-55px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
               <form ref={formRef} onSubmit={handleSubmit} className="contact-form flex w-full flex-col gap-7">
                 <div>
                   <label htmlFor="name">Your name</label>
