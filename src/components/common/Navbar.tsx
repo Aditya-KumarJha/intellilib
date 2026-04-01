@@ -118,6 +118,7 @@ export default function Navbar() {
             icon={<LogIn size={16} />}
             bgColor="bg-gradient-to-b from-zinc-200 to-zinc-400"
             textColor="text-black"
+            href="/login"
           />
 
           <Button
@@ -125,6 +126,7 @@ export default function Navbar() {
             icon={<UserPlus size={16} />}
             bgColor="bg-gradient-to-b from-purple-400 to-purple-600"
             textColor="text-white"
+            href="/signup"
           />
         </div>
 
@@ -178,6 +180,7 @@ export default function Navbar() {
                 icon={<LogIn size={16} />}
                 bgColor="bg-gradient-to-b from-zinc-200 to-zinc-400"
                 textColor="text-black"
+                href="/login"
               />
             </div>
             <div className="flex-1">
@@ -186,6 +189,7 @@ export default function Navbar() {
                 icon={<UserPlus size={16} />}
                 bgColor="bg-gradient-to-b from-purple-400 to-purple-600"
                 textColor="text-white"
+                href="/signup"
               />
             </div>
           </div>

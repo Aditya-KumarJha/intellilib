@@ -1,12 +1,14 @@
 "use client";
 
-import { ReactNode, useRef } from "react";
+import { ReactNode } from "react";
+import Link from "next/link";
 
 type ButtonProps = {
   text: string;
   icon?: ReactNode;
   textColor?: string;
   bgColor?: string;
+  href?: string;
 };
 
 export default function Button({
@@ -14,14 +16,11 @@ export default function Button({
   icon,
   textColor = "text-white",
   bgColor = "bg-gradient-to-b from-zinc-300 to-zinc-400",
+  href,
 }: ButtonProps) {
-  const ref = useRef<HTMLButtonElement>(null);
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    const btn = ref.current;
-    if (!btn) return;
-
-    const rect = btn.getBoundingClientRect();
+  const handleMouseMove = (e: React.MouseEvent<HTMLElement>) => {
+    const target = e.currentTarget;
+    const rect = target.getBoundingClientRect();
 
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -32,7 +31,7 @@ export default function Button({
     const offsetX = (x - centerX) / 6;
     const offsetY = (y - centerY) / 4;
 
-    btn.style.boxShadow = `
+    target.style.boxShadow = `
       inset ${-offsetX}px ${-offsetY}px 6px rgba(255,255,255,0.6),
       inset ${offsetX}px ${offsetY}px 6px rgba(0,0,0,0.25),
       ${offsetX * 2}px ${offsetY * 2}px 20px rgba(255,255,255,0.15),
@@ -40,11 +39,8 @@ export default function Button({
     `;
   };
 
-  const resetShadow = () => {
-    const btn = ref.current;
-    if (!btn) return;
-
-    btn.style.boxShadow = `
+  const resetShadow = (e: React.MouseEvent<HTMLElement>) => {
+    e.currentTarget.style.boxShadow = `
       inset 0 -2px 4px rgba(0,0,0,0.3),
       inset 0 2px 4px rgba(255,255,255,0.5),
       0 15px 20px -10px rgba(255,255,255,0.2),
@@ -52,26 +48,36 @@ export default function Button({
     `;
   };
 
+  const sharedProps = {
+    onMouseMove: handleMouseMove,
+    onMouseLeave: resetShadow,
+    className: `
+      ${bgColor} ${textColor}
+      px-5 py-2 rounded-full font-medium
+      flex items-center gap-2
+      transition-all duration-200
+    `,
+    style: {
+      boxShadow: `
+        inset 0 -2px 4px rgba(0,0,0,0.3),
+        inset 0 2px 4px rgba(255,255,255,0.5),
+        0 15px 20px -10px rgba(255,255,255,0.2),
+        0 30px 40px rgba(0,0,0,0.6)
+      `,
+    },
+  };
+
+  if (href) {
+    return (
+      <Link href={href} {...sharedProps}>
+        {icon}
+        <span>{text}</span>
+      </Link>
+    );
+  }
+
   return (
-    <button
-      ref={ref}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={resetShadow}
-      className={`
-        ${bgColor} ${textColor}
-        px-5 py-2 rounded-full font-medium
-        flex items-center gap-2
-        transition-all duration-200
-      `}
-      style={{
-        boxShadow: `
-          inset 0 -2px 4px rgba(0,0,0,0.3),
-          inset 0 2px 4px rgba(255,255,255,0.5),
-          0 15px 20px -10px rgba(255,255,255,0.2),
-          0 30px 40px rgba(0,0,0,0.6)
-        `,
-      }}
-    >
+    <button type="button" {...sharedProps}>
       {icon}
       <span>{text}</span>
     </button>
