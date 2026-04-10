@@ -9,7 +9,7 @@ type ButtonProps = {
   textColor?: string;
   bgColor?: string;
   href?: string;
-};
+} & React.ButtonHTMLAttributes<HTMLButtonElement>;
 
 export default function Button({
   text,
@@ -17,6 +17,7 @@ export default function Button({
   textColor = "text-white",
   bgColor = "bg-gradient-to-b from-zinc-300 to-zinc-400",
   href,
+  ...props
 }: ButtonProps) {
   const handleMouseMove = (e: React.MouseEvent<HTMLElement>) => {
     const target = e.currentTarget;
@@ -65,11 +66,11 @@ export default function Button({
         0 30px 40px rgba(0,0,0,0.6)
       `,
     },
-  };
+  } as any;
 
   if (href) {
     return (
-      <Link href={href} {...sharedProps}>
+      <Link href={href} {...(sharedProps as any)} {...(props as any)}>
         {icon}
         <span>{text}</span>
       </Link>
@@ -77,7 +78,7 @@ export default function Button({
   }
 
   return (
-    <button type="button" {...sharedProps}>
+    <button type="button" {...(sharedProps as any)} {...props}>
       {icon}
       <span>{text}</span>
     </button>

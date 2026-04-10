@@ -20,7 +20,21 @@ export default function SocialButtons({ onClick }: SocialButtonsProps) {
           type="button"
           aria-label={`Sign up with ${p.name}`}
           onClick={() => onClick(p.name)}
-          className="w-full flex items-center justify-center gap-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 hover:bg-gradient-to-r hover:from-teal-400 hover:to-cyan-500 hover:text-white transition rounded-lg py-3 active:scale-95 shadow-sm dark:shadow-md"
+          className="w-full flex items-center justify-center gap-2 rounded-lg py-3 active:scale-95 shadow-sm"
+          style={{
+            border: "1px solid var(--ai-badge-border)",
+            background: "var(--ai-badge-bg)",
+            color: "var(--ai-badge-text)",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background =
+              "linear-gradient(90deg, var(--ai-accent), var(--search-accent))";
+            (e.currentTarget as HTMLButtonElement).style.color = "white";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = "var(--ai-badge-bg)";
+            (e.currentTarget as HTMLButtonElement).style.color = "var(--ai-badge-text)";
+          }}
         >
           {p.icon} <span className="text-sm font-medium">{p.name}</span>
         </button>

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
+import useAuthStore from "@/lib/authStore";
 
 interface Props {
   email: string;
@@ -22,6 +23,7 @@ export default function OtpForm({ email, context, onVerified }: Props) {
     new Date(Date.now() + 10 * 60 * 1000)
   );
   const [remainingTime, setRemainingTime] = useState<number>(10 * 60);
+  const setUser = useAuthStore((s) => s.setUser);
 
   // Resend button timer
   useEffect(() => {
@@ -77,7 +79,7 @@ export default function OtpForm({ email, context, onVerified }: Props) {
       setLoading(true);
       setServerError(null);
 
-      const otpType = context === "signup" ? "signup" : context === "forgot" ? "recovery" : "email";
+      const otpType = context === "forgot" ? "recovery" : "email";
       const { error } = await supabase.auth.verifyOtp({
         email,
         token: otpCode,
@@ -88,7 +90,15 @@ export default function OtpForm({ email, context, onVerified }: Props) {
         throw error;
       }
 
-      toast.success("OTP verified successfully.");
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setUser({ id: data.user.id, email: data.user.email ?? null });
+      }
+      toast.success(
+        context === "signup"
+          ? "Account verified. Welcome to IntelliLib!"
+          : "OTP verified successfully."
+      );
       if (onVerified) {
         onVerified(email);
       }
@@ -156,7 +166,7 @@ export default function OtpForm({ email, context, onVerified }: Props) {
     setResendMessage(null);
 
     try {
-      const otpType = context === "signup" ? "signup" : context === "forgot" ? "recovery" : "email";
+      const otpType = context === "forgot" ? "recovery" : "email";
       const { error } = await supabase.auth.resend({
         type: otpType,
         email,
@@ -182,14 +192,21 @@ export default function OtpForm({ email, context, onVerified }: Props) {
   };
 
   return (
-    <div className="bg-white/80 dark:bg-black/80 backdrop-blur-md p-10 flex flex-col justify-center text-gray-900 dark:text-white rounded-r-2xl">
+    <div
+      className="backdrop-blur-md p-10 flex flex-col justify-center rounded-r-2xl"
+      style={{
+        background: "var(--ai-card-bg)",
+        border: "1px solid var(--ai-card-border)",
+        color: "var(--ai-input-text)",
+      }}
+    >
       <h2 className="text-2xl font-bold text-center mb-4">Verify OTP</h2>
-      <p className="text-sm text-gray-600 dark:text-gray-300 text-center mb-6">
+      <p className="text-sm text-center mb-6" style={{ color: "var(--ai-subtitle-color)" }}>
         Enter the 6-digit OTP sent to <strong>{email}</strong>
       </p>
 
       {remainingTime > 0 ? (
-        <p className="text-xs text-center text-gray-500 dark:text-gray-400 mb-4">
+        <p className="text-xs text-center mb-4" style={{ color: "var(--ai-icon-muted)" }}>
           OTP is valid for{" "}
           <span className="font-semibold">{formatTime(remainingTime)}</span>
         </p>
@@ -200,12 +217,26 @@ export default function OtpForm({ email, context, onVerified }: Props) {
       )}
 
       {serverError && (
-        <div className="mb-3 p-3 rounded-md bg-red-100 text-red-700 text-sm border border-red-300 text-center">
+        <div
+          className="mb-3 p-3 rounded-md text-sm text-center"
+          style={{
+            background: "var(--ai-status-issued-bg)",
+            color: "var(--ai-status-issued-text)",
+            border: "1px solid var(--ai-status-issued-border)",
+          }}
+        >
           {serverError}
         </div>
       )}
       {resendMessage && (
-        <div className="mb-3 p-3 rounded-md bg-green-100 text-green-700 text-sm border border-green-300 text-center">
+        <div
+          className="mb-3 p-3 rounded-md text-sm text-center"
+          style={{
+            background: "var(--ai-status-available-bg)",
+            color: "var(--ai-status-available-text)",
+            border: "1px solid var(--ai-status-available-border)",
+          }}
+        >
           {resendMessage}
         </div>
       )}
@@ -231,7 +262,12 @@ export default function OtpForm({ email, context, onVerified }: Props) {
               ref={(el) => {
                 otpRefs.current[i] = el;
               }}
-              className="w-14 h-14 text-center text-2xl rounded-lg border border-gray-300 dark:border-gray-600 focus:border-teal-400 focus:ring-2 focus:ring-cyan-400 bg-gray-100 dark:bg-gray-800 outline-none shadow hover:scale-105 transition active:scale-95"
+              className="w-14 h-14 text-center text-2xl rounded-lg outline-none shadow hover:scale-105 transition active:scale-95"
+              style={{
+                background: "var(--ai-panel-bg)",
+                border: "1px solid var(--ai-card-border)",
+                color: "var(--ai-input-text)",
+              }}
             />
           ))}
         </div>
@@ -239,7 +275,8 @@ export default function OtpForm({ email, context, onVerified }: Props) {
         <button
           type="submit"
           disabled={loading || otp.join("").length !== 6 || remainingTime <= 0}
-          className="mt-6 px-6 py-2 rounded-lg bg-teal-500 text-white font-medium hover:bg-cyan-500 transition disabled:opacity-50"
+          className="mt-6 px-6 py-2 rounded-lg font-medium transition disabled:opacity-50"
+          style={{ background: "var(--search-accent)", color: "white" }}
         >
           {loading ? "Verifying..." : "Verify OTP"}
         </button>
@@ -248,7 +285,8 @@ export default function OtpForm({ email, context, onVerified }: Props) {
           type="button"
           onClick={handleResend}
           disabled={resendDisabled}
-          className="text-sm text-teal-500 hover:text-cyan-500 mt-4 disabled:opacity-50"
+          className="text-sm mt-4 disabled:opacity-50"
+          style={{ color: "var(--search-accent)" }}
         >
           {resendDisabled
             ? `Resend OTP in ${timer}s`

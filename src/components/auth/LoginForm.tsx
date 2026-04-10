@@ -7,6 +7,7 @@ import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
 import Link from "next/link";
+import useAuthStore from "@/lib/authStore";
 
 interface Props {
   setOtpStep: (value: boolean) => void;
@@ -28,6 +29,7 @@ export default function LoginForm({
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const router = useRouter();
+  const setUser = useAuthStore((s) => s.setUser);
 
   useEffect(() => {
     const error = searchParams?.get("error");
@@ -74,7 +76,7 @@ export default function LoginForm({
       setUserEmail(form.email);
       setOtpContext("login");
       setOtpStep(true);
-      toast.success("OTP sent to your email.");
+      toast.success("OTP sent to your email. Please verify to continue.");
     } catch (err: any) {
       const message = err?.message || "Login failed";
       setServerError(message);
@@ -92,6 +94,7 @@ export default function LoginForm({
       if (error) {
         throw error;
       }
+      toast.success(`${provider} login started. Complete the authentication to continue.`);
     } catch (err: any) {
       const message = err?.message || `${provider} login failed.`;
       setServerError(message);
@@ -100,22 +103,44 @@ export default function LoginForm({
   };
 
   const inputBaseClasses =
-    "w-full px-4 py-3 rounded-lg border focus:border-teal-400 focus:ring-2 focus:ring-cyan-400 outline-none placeholder-gray-400 dark:placeholder-gray-500 transition";
+    "w-full px-4 py-3 rounded-lg border outline-none transition";
+
+  const inputStyle: React.CSSProperties = {
+    background: "var(--ai-panel-bg)",
+    borderColor: "var(--ai-card-border)",
+    color: "var(--ai-input-text)",
+  };
 
   return (
-    <div className="bg-white/80 dark:bg-black/80 backdrop-blur-md p-10 flex flex-col justify-center text-gray-900 dark:text-white rounded-r-2xl">
-      <h2 className="text-2xl font-bold text-center mb-2">Login to Credexa</h2>
-      <p className="text-sm text-gray-600 dark:text-gray-300 text-center mb-8">
-        Access your Credexa account to manage verified skills and micro-credentials.
+    <div
+      className="backdrop-blur-md p-10 flex flex-col justify-center rounded-r-2xl"
+      style={{
+        background: "var(--ai-card-bg)",
+        border: "1px solid var(--ai-card-border)",
+        color: "var(--ai-input-text)",
+      }}
+    >
+      <h2 className="text-2xl font-bold text-center mb-2">Login to Intellilib</h2>
+      <p className="text-sm text-center mb-8" style={{ color: "var(--ai-subtitle-color)" }}>
+        Access your IntelliLib account to manage books and activity.
       </p>
       <SocialButtons onClick={handleSocialLogin} />
       <div className="flex items-center gap-4 mb-6">
-        <div className="h-px bg-gray-300 dark:bg-gray-700 flex-1" />
-        <span className="text-xs text-gray-500 dark:text-gray-400">or continue with email</span>
-        <div className="h-px bg-gray-300 dark:bg-gray-700 flex-1" />
+        <div className="h-px flex-1" style={{ background: "var(--ai-row-border)" }} />
+        <span className="text-xs" style={{ color: "var(--ai-icon-muted)" }}>
+          or continue with email
+        </span>
+        <div className="h-px flex-1" style={{ background: "var(--ai-row-border)" }} />
       </div>
       {(errorMessage || serverError) && (
-        <div className="mb-3 p-3 rounded-md bg-red-100 text-red-700 text-sm border border-red-300 text-center">
+        <div
+          className="mb-3 p-3 rounded-md text-sm text-center"
+          style={{
+            background: "var(--ai-status-issued-bg)",
+            color: "var(--ai-status-issued-text)",
+            border: "1px solid var(--ai-status-issued-border)",
+          }}
+        >
           {errorMessage || serverError}
         </div>
       )}
@@ -127,9 +152,11 @@ export default function LoginForm({
             placeholder="Email address"
             value={form.email}
             onChange={handleChange}
-            className={`${inputBaseClasses} ${
-              errors.email ? "border-red-500" : "border-gray-300 dark:border-gray-600"
-            }`}
+            className={inputBaseClasses}
+            style={{
+              ...inputStyle,
+              borderColor: errors.email ? "var(--ai-status-issued-border)" : inputStyle.borderColor,
+            }}
           />
           {errors.email && <p className="text-red-500 text-xs mt-1">Please fill this field</p>}
         </div>
@@ -140,9 +167,11 @@ export default function LoginForm({
             placeholder="Password"
             value={form.password}
             onChange={handleChange}
-            className={`${inputBaseClasses} ${
-              errors.password ? "border-red-500" : "border-gray-300 dark:border-gray-600"
-            }`}
+            className={inputBaseClasses}
+            style={{
+              ...inputStyle,
+              borderColor: errors.password ? "var(--ai-status-issued-border)" : inputStyle.borderColor,
+            }}
           />
           {errors.password && <p className="text-red-500 text-xs mt-1">Please fill this field</p>}
           <button
@@ -157,13 +186,14 @@ export default function LoginForm({
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3 bg-gradient-to-r from-teal-400 to-cyan-500 hover:from-cyan-500 hover:to-teal-400 rounded-lg transition font-medium active:scale-95 text-white shadow-md hover:shadow-lg disabled:opacity-50"
+          className="w-full py-3 rounded-lg transition font-medium active:scale-95 text-white shadow-md hover:shadow-lg disabled:opacity-50"
+          style={{ background: "linear-gradient(90deg, var(--ai-accent), var(--search-accent))" }}
         >
           {loading ? "Logging in..." : "Login"}
         </button>
         <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-4">
-          Don’t have a Credexa account?{" "}
-          <Link href="/signup" className="text-teal-500 dark:text-cyan-400 hover:underline">
+          Don’t have a IntelliLib account?{" "}
+          <Link href="/signup" className="hover:underline" style={{ color: "var(--search-accent)" }}>
             Sign Up
           </Link>
         </p>

@@ -69,7 +69,7 @@ const Footer = () => {
               </Link>
             ))}
           </div>
-          <div className="mt-6 rounded-2xl border border-purple-400/40 bg-gradient-to-br from-purple-100/70 via-white to-white px-4 py-3 text-xs text-black/70 dark:border-purple-400/40 dark:from-purple-500/20 dark:via-black/40 dark:to-black/70 dark:text-white/70">
+          <div className="mt-6 rounded-2xl border border-purple-400/40 bg-linear-to-br from-purple-100/70 via-white to-white px-4 py-3 text-xs text-black/70 dark:border-purple-400/40 dark:from-purple-500/20 dark:via-black/40 dark:to-black/70 dark:text-white/70">
             221B Crescent Ave, San Francisco, CA 94107
           </div>
         </div>

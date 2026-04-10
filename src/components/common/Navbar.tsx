@@ -5,6 +5,10 @@ import { Home, Search, Bookmark, User, UserPlus, LogIn, Menu, X } from "lucide-r
 import Link from "next/link";
 import Button from "../ui/Button";
 import ThemeToggleButton from "../ui/theme-toggle-button";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
+import useAuthStore from "@/lib/authStore";
+import { toast } from "react-toastify";
 
 export default function Navbar() {
   const [active, setActive] = useState<string | null>(null);
@@ -105,30 +109,7 @@ export default function Navbar() {
         </div>
 
         {/* Right - Auth Buttons */}
-        <div className={`hidden md:flex items-center gap-3 ${scrolledTextClass}`}>
-          <ThemeToggleButton
-            className={
-              scrolled
-                ? "bg-black/10 border-black/20 text-black dark:bg-white/10 dark:border-white/20 dark:text-white"
-                : ""
-            }
-          />
-          <Button
-            text="Login"
-            icon={<LogIn size={16} />}
-            bgColor="bg-gradient-to-b from-zinc-200 to-zinc-400"
-            textColor="text-black"
-            href="/login"
-          />
-
-          <Button
-            text="Sign Up"
-            icon={<UserPlus size={16} />}
-            bgColor="bg-gradient-to-b from-purple-400 to-purple-600"
-            textColor="text-white"
-            href="/signup"
-          />
-        </div>
+        <AuthButtons scrolledTextClass={scrolledTextClass} scrolled={scrolled} />
 
         {/* Mobile - Theme + Hamburger */}
         <div className={`flex items-center gap-2 md:hidden ${scrolledTextClass}`}>
@@ -196,5 +177,76 @@ export default function Navbar() {
         </div>
       </div>
     </nav>
+  );
+}
+
+function AuthButtons({ scrolledTextClass, scrolled }: { scrolledTextClass: string; scrolled: boolean }) {
+  const router = useRouter();
+  const { user, isAuthenticated, clearUser, init } = useAuthStore();
+
+  useEffect(() => {
+    init();
+  }, [init]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    clearUser();
+    toast.success("Logged out successfully.");
+    router.push("/");
+  };
+
+  if (isAuthenticated && user) {
+    return (
+      <div className={`hidden md:flex items-center gap-3 ${scrolledTextClass}`}>
+        <ThemeToggleButton
+          className={
+            scrolled
+              ? "bg-black/10 border-black/20 text-black dark:bg-white/10 dark:border-white/20 dark:text-white"
+              : ""
+          }
+        />
+        <Button
+          text="Dashboard"
+          icon={<Home size={16} />}
+          bgColor="bg-gradient-to-b from-purple-400 to-purple-600"
+          textColor="text-white"
+          href="/dashboard"
+        />
+        <Button
+          text="Logout"
+          icon={<LogIn size={16} />}
+          textColor="text-white"
+          bgColor="bg-gradient-to-b from-teal-400 to-cyan-500"
+          onClick={handleLogout as any}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`hidden md:flex items-center gap-3 ${scrolledTextClass}`}>
+      <ThemeToggleButton
+        className={
+          scrolled
+            ? "bg-black/10 border-black/20 text-black dark:bg-white/10 dark:border-white/20 dark:text-white"
+            : ""
+        }
+      />
+      <Button
+        text="Login"
+        icon={<LogIn size={16} />}
+        bgColor="bg-gradient-to-b from-zinc-200 to-zinc-400"
+        textColor="text-black"
+        href="/login"
+      />
+
+      <Button
+        text="Sign Up"
+        icon={<UserPlus size={16} />}
+        bgColor="bg-gradient-to-b from-purple-400 to-purple-600"
+        textColor="text-white"
+        href="/signup"
+      />
+    </div>
   );
 }

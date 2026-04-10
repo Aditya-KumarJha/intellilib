@@ -6,6 +6,8 @@ import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import useAuthStore from "@/lib/authStore";
 
 interface Props {
   setOtpStep: (value: boolean) => void;
@@ -13,9 +15,18 @@ interface Props {
   setOtpContext: (value: "login" | "signup") => void;
 }
 
-export default function SignupForm({ setOtpStep, setUserEmail, setOtpContext }: Props) {
+export default function SignupForm({
+  setOtpStep,
+  setUserEmail,
+  setOtpContext,
+}: Props) {
   const [showPassword, setShowPassword] = useState(false);
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "" });
+  const [form, setForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+  });
   const [errors, setErrors] = useState({
     firstName: false,
     lastName: false,
@@ -24,6 +35,8 @@ export default function SignupForm({ setOtpStep, setUserEmail, setOtpContext }: 
   });
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const router = useRouter();
+  const setUser = useAuthStore((s) => s.setUser);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -65,10 +78,11 @@ export default function SignupForm({ setOtpStep, setUserEmail, setOtpContext }: 
     try {
       setLoading(true);
       setServerError(null);
-      const { error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signInWithOtp({
         email: form.email,
-        password: form.password,
         options: {
+          shouldCreateUser: true,
+          emailRedirectTo: undefined,
           data: {
             first_name: form.firstName,
             last_name: form.lastName,
@@ -82,7 +96,7 @@ export default function SignupForm({ setOtpStep, setUserEmail, setOtpContext }: 
       setUserEmail(form.email);
       setOtpContext("signup");
       setOtpStep(true);
-      toast.success("Account created. Check your email for the OTP.");
+      toast.success("OTP sent to your email. Please verify to finish signup.");
     } catch (err: any) {
       const msg = err?.message || "Something went wrong. Please try again.";
       setServerError(msg);
@@ -100,6 +114,9 @@ export default function SignupForm({ setOtpStep, setUserEmail, setOtpContext }: 
       if (error) {
         throw error;
       }
+      toast.success(
+        `${provider} signup started. Complete the authentication to continue.`,
+      );
     } catch (err: any) {
       const msg = err?.message || `${provider} signup failed.`;
       setServerError(msg);
@@ -108,25 +125,58 @@ export default function SignupForm({ setOtpStep, setUserEmail, setOtpContext }: 
   };
 
   const inputBaseClasses =
-    "w-full px-4 py-3 rounded-lg border focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400 outline-none placeholder-gray-400 dark:placeholder-gray-500 transition";
+    "w-full px-4 py-3 rounded-lg border outline-none transition";
+
+  const inputStyle: React.CSSProperties = {
+    background: "var(--ai-panel-bg)",
+    borderColor: "var(--ai-card-border)",
+    color: "var(--ai-input-text)",
+  };
 
   return (
-    <div className="bg-white/80 dark:bg-black/80 backdrop-blur-md p-10 flex flex-col justify-center text-gray-900 dark:text-white rounded-r-2xl">
-      <h2 className="text-2xl font-bold text-center mb-2">Sign Up for Credexa</h2>
-      <p className="text-sm text-gray-600 dark:text-gray-300 text-center mb-6">
-        Join Credexa to access secure, verified, and modern learning experiences.
+    <div
+      className="backdrop-blur-md p-10 flex flex-col justify-center rounded-r-2xl"
+      style={{
+        background: "var(--ai-card-bg)",
+        border: "1px solid var(--ai-card-border)",
+        color: "var(--ai-input-text)",
+      }}
+    >
+      <h2 className="text-2xl font-bold text-center mb-2">
+        Sign Up for IntelliLib
+      </h2>
+      <p
+        className="text-sm text-center mb-6"
+        style={{ color: "var(--ai-subtitle-color)" }}
+      >
+        Join IntelliLib to explore and manage books effortlessly.
       </p>
 
       <SocialButtons onClick={handleSocialLogin} />
 
       <div className="flex items-center gap-4 mb-6">
-        <div className="h-px bg-gray-300 dark:bg-gray-700 flex-1" />
-        <span className="text-xs text-gray-500 dark:text-gray-400">or sign up with email</span>
-        <div className="h-px bg-gray-300 dark:bg-gray-700 flex-1" />
+        <div
+          className="h-px flex-1"
+          style={{ background: "var(--ai-row-border)" }}
+        />
+        <span className="text-xs" style={{ color: "var(--ai-icon-muted)" }}>
+          or sign up with email
+        </span>
+        <div
+          className="h-px flex-1"
+          style={{ background: "var(--ai-row-border)" }}
+        />
       </div>
 
       {serverError && (
-        <div className="mb-4 p-3 rounded-md bg-red-100 text-red-700 text-sm border border-red-300">
+        <div
+          className="mb-4 p-3 rounded-md text-sm"
+          style={{
+            background: "var(--ai-status-issued-bg)",
+            color: "var(--ai-status-issued-text)",
+            border: "1px solid var(--ai-status-issued-border)",
+          }}
+        >
           {serverError}
         </div>
       )}
@@ -140,12 +190,18 @@ export default function SignupForm({ setOtpStep, setUserEmail, setOtpContext }: 
               placeholder="First name"
               value={form.firstName}
               onChange={handleChange}
-              className={`${inputBaseClasses} ${
-                errors.firstName ? "border-red-500" : "border-gray-300 dark:border-gray-600"
-              }`}
+              className={inputBaseClasses}
+              style={{
+                ...inputStyle,
+                borderColor: errors.firstName
+                  ? "var(--ai-status-issued-border)"
+                  : inputStyle.borderColor,
+              }}
             />
             {errors.firstName && (
-              <p className="text-red-500 text-xs mt-1">Please fill this field</p>
+              <p className="text-red-500 text-xs mt-1">
+                Please fill this field
+              </p>
             )}
           </div>
           <div>
@@ -156,11 +212,15 @@ export default function SignupForm({ setOtpStep, setUserEmail, setOtpContext }: 
               value={form.lastName}
               onChange={handleChange}
               className={`${inputBaseClasses} ${
-                errors.lastName ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+                errors.lastName
+                  ? "border-red-500"
+                  : "border-gray-300 dark:border-gray-600"
               }`}
             />
             {errors.lastName && (
-              <p className="text-red-500 text-xs mt-1">Please fill this field</p>
+              <p className="text-red-500 text-xs mt-1">
+                Please fill this field
+              </p>
             )}
           </div>
         </div>
@@ -172,11 +232,17 @@ export default function SignupForm({ setOtpStep, setUserEmail, setOtpContext }: 
             placeholder="Email address"
             value={form.email}
             onChange={handleChange}
-            className={`${inputBaseClasses} ${
-              errors.email ? "border-red-500" : "border-gray-300 dark:border-gray-600"
-            }`}
+            className={inputBaseClasses}
+            style={{
+              ...inputStyle,
+              borderColor: errors.email
+                ? "var(--ai-status-issued-border)"
+                : inputStyle.borderColor,
+            }}
           />
-          {errors.email && <p className="text-red-500 text-xs mt-1">Please fill this field</p>}
+          {errors.email && (
+            <p className="text-red-500 text-xs mt-1">Please fill this field</p>
+          )}
         </div>
 
         <div className="relative">
@@ -186,11 +252,17 @@ export default function SignupForm({ setOtpStep, setUserEmail, setOtpContext }: 
             placeholder="Password"
             value={form.password}
             onChange={handleChange}
-            className={`${inputBaseClasses} ${
-              errors.password ? "border-red-500" : "border-gray-300 dark:border-gray-600"
-            }`}
+            className={inputBaseClasses}
+            style={{
+              ...inputStyle,
+              borderColor: errors.password
+                ? "var(--ai-status-issued-border)"
+                : inputStyle.borderColor,
+            }}
           />
-          {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+          {errors.password && (
+            <p className="text-red-500 text-xs mt-1">{errors.password}</p>
+          )}
           <button
             type="button"
             onClick={() => setShowPassword((s) => !s)}
@@ -204,14 +276,25 @@ export default function SignupForm({ setOtpStep, setUserEmail, setOtpContext }: 
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3 bg-gradient-to-r from-teal-400 to-cyan-500 hover:from-cyan-500 hover:to-teal-400 rounded-lg transition font-medium active:scale-95 text-white shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-3 rounded-lg transition font-medium active:scale-95 text-white shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background:
+              "linear-gradient(90deg, var(--ai-accent), var(--search-accent))",
+          }}
         >
           {loading ? "Creating Account..." : "Sign Up"}
         </button>
 
-        <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-4">
+        <p
+          className="text-center text-sm mt-4"
+          style={{ color: "var(--ai-subtitle-color)" }}
+        >
           Already registered?{" "}
-          <Link href="/login" className="text-indigo-500 dark:text-indigo-400 hover:underline">
+          <Link
+            href="/login"
+            className="hover:underline"
+            style={{ color: "var(--ai-accent)" }}
+          >
             Login
           </Link>
         </p>

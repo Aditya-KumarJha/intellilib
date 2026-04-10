@@ -17,12 +17,12 @@ export default function AnimationPanel({ page = "signup" }: AnimationPanelProps)
   return (
     <div className="relative bg-white dark:bg-black/90 p-10 flex flex-col justify-center items-center text-center text-gray-900 dark:text-gray-100 rounded-l-2xl">
       <h1 className="text-4xl font-bold z-10 mb-4">
-        {page === "login" ? "Welcome Back to Credexa" : "Join Credexa"}
+        {page === "login" ? "Welcome Back to IntelliLib" : "Join IntelliLib"}
       </h1>
       <p className="mt-2 max-w-md z-10 text-lg opacity-90 mb-6">
         {page === "login"
-          ? "Access your Credexa profile securely and explore verified micro-credentials aligned with NSQF standards."
-          : "Sign up to Credexa to showcase your skills with blockchain-backed credentials for career growth."}
+          ? "Access your IntelliLib account and explore books with AI."
+          : "Join IntelliLib to discover, manage, and explore books smarter."}
       </p>
 
       <div className="hidden xl:flex gap-6 z-10">
