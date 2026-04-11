@@ -1,3 +1,13 @@
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Privacy Policy",
+  description:
+    "Read how IntelliLib collects, uses, and protects data across AI-powered library services, real-time tracking, and analytics dashboards.",
+  path: "/privacy",
+  keywords: ["privacy policy", "data protection", "IntelliLib privacy"],
+});
+
 const PrivacyPage = () => {
   return (
     <main className="mx-auto w-full max-w-5xl px-6 pb-24 pt-28 text-black dark:text-white">
@@ -69,7 +79,7 @@ const PrivacyPage = () => {
         </div>
       </section>
 
-      <section className="mt-8 rounded-2xl border border-black/10 bg-gradient-to-br from-white via-white to-blue-50 p-6 text-sm text-black/70 shadow-sm dark:border-white/10 dark:from-black/70 dark:via-black/70 dark:to-blue-500/10 dark:text-white/70">
+      <section className="mt-8 rounded-2xl border border-black/10 bg-linear-to-br from-white via-white to-blue-50 p-6 text-sm text-black/70 shadow-sm dark:border-white/10 dark:from-black/70 dark:via-black/70 dark:to-blue-500/10 dark:text-white/70">
         <h2 className="text-lg font-semibold text-black dark:text-white">Contact</h2>
         <p className="mt-2">For privacy questions, email privacy@intellilib.ai.</p>
         <p className="mt-4">We respond to verified requests within 30 days.</p>

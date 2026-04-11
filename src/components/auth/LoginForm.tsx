@@ -9,6 +9,7 @@ import { toast } from "react-toastify";
 import Link from "next/link";
 import { isEmailVerified } from "@/lib/authUser";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { useMutation } from "@tanstack/react-query";
 
 interface Props {
   setOtpStep: (value: boolean) => void;
@@ -27,9 +28,49 @@ export default function LoginForm({
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({ email: false, password: false });
-  const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const router = useRouter();
+
+  const loginMutation = useMutation({
+    mutationFn: async (payload: { email: string; password: string }) => {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: payload.email,
+        password: payload.password,
+      });
+      if (error) {
+        throw error;
+      }
+
+      if (!isEmailVerified(data.user)) {
+        await supabase.auth.signOut();
+        throw new Error("Please verify your email OTP first before logging in.");
+      }
+
+      await supabase.auth.signOut();
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email: payload.email,
+        options: {
+          shouldCreateUser: false,
+        },
+      });
+      if (otpError) {
+        throw otpError;
+      }
+
+      return payload.email;
+    },
+    onSuccess: (email) => {
+      setUserEmail(email);
+      setOtpContext("login");
+      setOtpStep(true);
+      toast.success("Enter OTP from email.");
+    },
+    onError: (err) => {
+      const message = getErrorMessage(err, "Login failed");
+      setServerError(message);
+      toast.error(message);
+    },
+  });
 
   useEffect(() => {
     const error = searchParams?.get("error");
@@ -56,43 +97,8 @@ export default function LoginForm({
     };
     setErrors(newErrors);
     if (Object.values(newErrors).some(Boolean)) return;
-    try {
-      setLoading(true);
-      setServerError(null);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: form.email,
-        password: form.password,
-      });
-      if (error) {
-        throw error;
-      }
-
-      if (!isEmailVerified(data.user)) {
-        await supabase.auth.signOut();
-        throw new Error("Please verify your email OTP first before logging in.");
-      }
-
-      await supabase.auth.signOut();
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: form.email,
-        options: {
-          shouldCreateUser: false,
-        },
-      });
-      if (otpError) {
-        throw otpError;
-      }
-      setUserEmail(form.email);
-      setOtpContext("login");
-      setOtpStep(true);
-      toast.success("Enter OTP from email.");
-    } catch (err: unknown) {
-      const message = getErrorMessage(err, "Login failed");
-      setServerError(message);
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
+    setServerError(null);
+    loginMutation.mutate({ email: form.email, password: form.password });
   };
 
   const handleSocialLogin = async (provider: string) => {
@@ -194,11 +200,11 @@ export default function LoginForm({
         </div>
         <button
           type="submit"
-          disabled={loading}
+          disabled={loginMutation.isPending}
           className="w-full py-3 rounded-lg transition font-medium active:scale-95 text-white shadow-md hover:shadow-lg disabled:opacity-50"
           style={{ background: "linear-gradient(90deg, var(--ai-accent), var(--search-accent))" }}
         >
-          {loading ? "Logging in..." : "Login"}
+          {loginMutation.isPending ? "Logging in..." : "Login"}
         </button>
         <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-4">
           Don’t have a IntelliLib account?{" "}

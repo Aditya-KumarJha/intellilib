@@ -2,10 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import AnimationPanel from "@/components/auth/AnimationPanel";
+import dynamic from "next/dynamic";
 import LoginForm from "@/components/auth/LoginForm";
 import SignupForm from "@/components/auth/SignUpForm";
 import OtpForm from "@/components/auth/OtpForm";
+
+const AnimationPanel = dynamic(() => import("@/components/auth/AnimationPanel"), {
+  ssr: false,
+  loading: () => <div className="hidden lg:block h-full w-full" />,
+});
 
 interface AuthPageProps {
   initialMode?: "login" | "signup";

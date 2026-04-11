@@ -1,3 +1,14 @@
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Delete Account",
+  description:
+    "Instructions for permanently deleting your IntelliLib account, exports, and saved collections.",
+  path: "/delete-account",
+  noIndex: true,
+  keywords: ["delete account", "close account", "IntelliLib removal"],
+});
+
 const DeleteAccountPage = () => {
   return (
     <main className="mx-auto w-full max-w-5xl px-6 pb-24 pt-28 text-black dark:text-white">

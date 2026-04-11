@@ -1,3 +1,13 @@
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Terms of Service",
+  description:
+    "Review the IntelliLib terms of service covering platform usage, subscriptions, and acceptable use for smart library management.",
+  path: "/terms",
+  keywords: ["terms of service", "platform terms", "IntelliLib terms"],
+});
+
 const TermsPage = () => {
   return (
     <main className="mx-auto w-full max-w-5xl px-6 pb-24 pt-28 text-black dark:text-white">
@@ -69,7 +79,7 @@ const TermsPage = () => {
         </div>
       </section>
 
-      <section className="mt-8 rounded-2xl border border-black/10 bg-gradient-to-br from-white via-white to-purple-50 p-6 text-sm text-black/70 shadow-sm dark:border-white/10 dark:from-black/70 dark:via-black/70 dark:to-purple-500/10 dark:text-white/70">
+      <section className="mt-8 rounded-2xl border border-black/10 bg-linear-to-br from-white via-white to-purple-50 p-6 text-sm text-black/70 shadow-sm dark:border-white/10 dark:from-black/70 dark:via-black/70 dark:to-purple-500/10 dark:text-white/70">
         <h2 className="text-lg font-semibold text-black dark:text-white">Changes and termination</h2>
         <p className="mt-2">
           We may update these terms with notice. Continued use after updates means you accept

@@ -1,3 +1,13 @@
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+  title: "Cookie Policy",
+  description:
+    "Learn how IntelliLib uses cookies to keep AI-powered library services reliable, secure, and personalized across devices.",
+  path: "/cookies",
+  keywords: ["cookie policy", "tracking preferences", "IntelliLib cookies"],
+});
+
 const CookiesPage = () => {
   return (
     <main className="mx-auto w-full max-w-5xl px-6 pb-24 pt-28 text-black dark:text-white">

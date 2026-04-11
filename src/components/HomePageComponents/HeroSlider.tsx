@@ -31,6 +31,8 @@ export default function HeroSlider() {
               fill
               sizes="200px"
               className="object-cover"
+              priority={index === 0}
+              loading={index === 0 ? "eager" : "lazy"}
             />
           </div>
         ))}

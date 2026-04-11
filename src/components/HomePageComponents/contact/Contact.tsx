@@ -3,9 +3,18 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import emailjs from "@emailjs/browser";
 import { toast } from "react-toastify";
+import dynamic from "next/dynamic";
 
 import TitleHeader from "../../common/TitleHeader";
-import ContactExperience from "./ContactExperience";
+
+const ContactExperience = dynamic(() => import("./ContactExperience"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full w-full items-center justify-center text-sm text-white/70">
+      Loading 3D experience...
+    </div>
+  ),
+});
 
 type ContactFormState = {
   name: string;

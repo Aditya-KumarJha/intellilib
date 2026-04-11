@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
 import Link from "next/link";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { useMutation } from "@tanstack/react-query";
 
 interface Props {
   setOtpStep: (value: boolean) => void;
@@ -32,8 +33,50 @@ export default function SignupForm({
     email: false,
     password: "",
   });
-  const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  const signupMutation = useMutation({
+    mutationFn: async (payload: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      password: string;
+    }) => {
+      const { data, error } = await supabase.auth.signUp({
+        email: payload.email,
+        password: payload.password,
+        options: {
+          data: {
+            full_name: `${payload.firstName} ${payload.lastName}`.trim(),
+            first_name: payload.firstName,
+            last_name: payload.lastName,
+            role: "user",
+          },
+        },
+      });
+      if (error) {
+        throw error;
+      }
+
+      // Keep signup users in a pending state until email OTP verification completes.
+      if (data.session) {
+        await supabase.auth.signOut();
+      }
+
+      return payload.email;
+    },
+    onSuccess: (email) => {
+      setUserEmail(email);
+      setOtpContext("signup");
+      setOtpStep(true);
+      toast.success("Enter OTP from email.");
+    },
+    onError: (err) => {
+      const msg = getErrorMessage(err, "Something went wrong. Please try again.");
+      setServerError(msg);
+      toast.error(msg);
+    },
+  });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -45,7 +88,7 @@ export default function SignupForm({
     setServerError(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     const newErrors = {
@@ -72,40 +115,13 @@ export default function SignupForm({
       return;
     }
 
-    try {
-      setLoading(true);
-      setServerError(null);
-      const { data, error } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
-        options: {
-          data: {
-            first_name: form.firstName,
-            last_name: form.lastName,
-            role: "user",
-          },
-        },
-      });
-      if (error) {
-        throw error;
-      }
-
-      // Keep signup users in a pending state until email OTP verification completes.
-      if (data.session) {
-        await supabase.auth.signOut();
-      }
-
-      setUserEmail(form.email);
-      setOtpContext("signup");
-      setOtpStep(true);
-      toast.success("Enter OTP from email.");
-    } catch (err: unknown) {
-      const msg = getErrorMessage(err, "Something went wrong. Please try again.");
-      setServerError(msg);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
+    setServerError(null);
+    signupMutation.mutate({
+      firstName: form.firstName,
+      lastName: form.lastName,
+      email: form.email,
+      password: form.password,
+    });
   };
 
   const handleSocialLogin = async (provider: string) => {
@@ -275,14 +291,14 @@ export default function SignupForm({
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={signupMutation.isPending}
           className="w-full py-3 rounded-lg transition font-medium active:scale-95 text-white shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background:
               "linear-gradient(90deg, var(--ai-accent), var(--search-accent))",
           }}
         >
-          {loading ? "Creating Account..." : "Sign Up"}
+          {signupMutation.isPending ? "Signing up..." : "Sign Up"}
         </button>
 
         <p
