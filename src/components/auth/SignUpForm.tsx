@@ -6,8 +6,7 @@ import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import useAuthStore from "@/lib/authStore";
+import { getErrorMessage } from "@/lib/errorMessage";
 
 interface Props {
   setOtpStep: (value: boolean) => void;
@@ -35,8 +34,6 @@ export default function SignupForm({
   });
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-  const router = useRouter();
-  const setUser = useAuthStore((s) => s.setUser);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -78,11 +75,10 @@ export default function SignupForm({
     try {
       setLoading(true);
       setServerError(null);
-      const { error } = await supabase.auth.signInWithOtp({
+      const { data, error } = await supabase.auth.signUp({
         email: form.email,
+        password: form.password,
         options: {
-          shouldCreateUser: true,
-          emailRedirectTo: undefined,
           data: {
             first_name: form.firstName,
             last_name: form.lastName,
@@ -93,12 +89,18 @@ export default function SignupForm({
       if (error) {
         throw error;
       }
+
+      // Keep signup users in a pending state until email OTP verification completes.
+      if (data.session) {
+        await supabase.auth.signOut();
+      }
+
       setUserEmail(form.email);
       setOtpContext("signup");
       setOtpStep(true);
-      toast.success("OTP sent to your email. Please verify to finish signup.");
-    } catch (err: any) {
-      const msg = err?.message || "Something went wrong. Please try again.";
+      toast.success("Enter OTP from email.");
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err, "Something went wrong. Please try again.");
       setServerError(msg);
       toast.error(msg);
     } finally {
@@ -114,11 +116,9 @@ export default function SignupForm({
       if (error) {
         throw error;
       }
-      toast.success(
-        `${provider} signup started. Complete the authentication to continue.`,
-      );
-    } catch (err: any) {
-      const msg = err?.message || `${provider} signup failed.`;
+      // No toast on OAuth start; show success after redirect if needed.
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err, `${provider} signup failed.`);
       setServerError(msg);
       toast.error(msg);
     }

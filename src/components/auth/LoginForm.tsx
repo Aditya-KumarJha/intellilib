@@ -7,7 +7,8 @@ import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
 import Link from "next/link";
-import useAuthStore from "@/lib/authStore";
+import { isEmailVerified } from "@/lib/authUser";
+import { getErrorMessage } from "@/lib/errorMessage";
 
 interface Props {
   setOtpStep: (value: boolean) => void;
@@ -29,7 +30,6 @@ export default function LoginForm({
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const router = useRouter();
-  const setUser = useAuthStore((s) => s.setUser);
 
   useEffect(() => {
     const error = searchParams?.get("error");
@@ -40,7 +40,7 @@ export default function LoginForm({
       params.delete("error");
       router.replace(`?${params.toString()}`, { scroll: false });
     }
-  }, [searchParams]);
+  }, [router, searchParams]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -59,16 +59,25 @@ export default function LoginForm({
     try {
       setLoading(true);
       setServerError(null);
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: form.email,
         password: form.password,
       });
       if (error) {
         throw error;
       }
+
+      if (!isEmailVerified(data.user)) {
+        await supabase.auth.signOut();
+        throw new Error("Please verify your email OTP first before logging in.");
+      }
+
       await supabase.auth.signOut();
       const { error: otpError } = await supabase.auth.signInWithOtp({
         email: form.email,
+        options: {
+          shouldCreateUser: false,
+        },
       });
       if (otpError) {
         throw otpError;
@@ -76,9 +85,9 @@ export default function LoginForm({
       setUserEmail(form.email);
       setOtpContext("login");
       setOtpStep(true);
-      toast.success("OTP sent to your email. Please verify to continue.");
-    } catch (err: any) {
-      const message = err?.message || "Login failed";
+      toast.success("Enter OTP from email.");
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, "Login failed");
       setServerError(message);
       toast.error(message);
     } finally {
@@ -94,9 +103,9 @@ export default function LoginForm({
       if (error) {
         throw error;
       }
-      toast.success(`${provider} login started. Complete the authentication to continue.`);
-    } catch (err: any) {
-      const message = err?.message || `${provider} login failed.`;
+      // No toast on OAuth start; show success after redirect if needed.
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, `${provider} login failed.`);
       setServerError(message);
       toast.error(message);
     }

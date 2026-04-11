@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
 import useAuthStore from "@/lib/authStore";
+import { toAuthUser } from "@/lib/authUser";
+import { getErrorMessage } from "@/lib/errorMessage";
 
 interface Props {
   email: string;
@@ -79,7 +81,8 @@ export default function OtpForm({ email, context, onVerified }: Props) {
       setLoading(true);
       setServerError(null);
 
-      const otpType = context === "forgot" ? "recovery" : "email";
+      const otpType =
+        context === "forgot" ? "recovery" : context === "signup" ? "signup" : "email";
       const { error } = await supabase.auth.verifyOtp({
         email,
         token: otpCode,
@@ -91,19 +94,19 @@ export default function OtpForm({ email, context, onVerified }: Props) {
       }
 
       const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        setUser({ id: data.user.id, email: data.user.email ?? null });
+      const authUser = toAuthUser(data?.user);
+      if (authUser) {
+        setUser(authUser);
+      } else if (context !== "forgot") {
+        throw new Error("Email verification is still incomplete. Please request a new OTP.");
       }
-      toast.success(
-        context === "signup"
-          ? "Account verified. Welcome to IntelliLib!"
-          : "OTP verified successfully."
-      );
+
+      toast.success(context === "signup" ? "Signup successful." : "Login successful.");
       if (onVerified) {
         onVerified(email);
       }
-    } catch (err: any) {
-      const message = err?.message || "OTP verification failed.";
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, "OTP verification failed.");
       setServerError(message);
       toast.error(message);
     } finally {
@@ -166,19 +169,34 @@ export default function OtpForm({ email, context, onVerified }: Props) {
     setResendMessage(null);
 
     try {
-      const otpType = context === "forgot" ? "recovery" : "email";
-      const { error } = await supabase.auth.resend({
-        type: otpType,
-        email,
-      });
-      if (error) {
-        throw error;
+      if (context === "signup") {
+        const { error } = await supabase.auth.resend({
+          type: "signup",
+          email,
+        });
+        if (error) {
+          throw error;
+        }
+      } else if (context === "login") {
+        const { error } = await supabase.auth.signInWithOtp({
+          email,
+          options: { shouldCreateUser: false },
+        });
+        if (error) {
+          throw error;
+        }
+      } else {
+        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        if (error) {
+          throw error;
+        }
       }
+
       setResendMessage("OTP has been resent to your email.");
       setExpiresAt(new Date(Date.now() + 10 * 60 * 1000));
       setRemainingTime(10 * 60);
-    } catch (err: any) {
-      const message = err?.message || "Failed to resend OTP.";
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, "Failed to resend OTP.");
       setServerError(message);
       toast.error(message);
       setResendDisabled(false);

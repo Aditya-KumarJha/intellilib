@@ -2,16 +2,12 @@
 
 import { create } from "zustand";
 import { supabase } from "@/lib/supabaseClient";
-
-type User = {
-  id: string;
-  email: string | null;
-};
+import { toAuthUser, type AuthUser } from "@/lib/authUser";
 
 type AuthState = {
-  user: User | null;
+  user: AuthUser | null;
   isAuthenticated: boolean;
-  setUser: (u: User | null) => void;
+  setUser: (u: AuthUser | null) => void;
   clearUser: () => void;
   init: () => void;
 };
@@ -24,8 +20,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   init: () => {
     // subscribe to supabase auth changes
     supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        set({ user: { id: session.user.id, email: session.user.email ?? null }, isAuthenticated: true });
+      const user = toAuthUser(session?.user);
+      if (user) {
+        set({ user, isAuthenticated: true });
       } else {
         set({ user: null, isAuthenticated: false });
       }
@@ -35,10 +32,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     (async () => {
       try {
         const { data } = await supabase.auth.getUser();
-        if (data?.user) {
-          set({ user: { id: data.user.id, email: data.user.email ?? null }, isAuthenticated: true });
+        const user = toAuthUser(data?.user);
+        if (user) {
+          set({ user, isAuthenticated: true });
+        } else {
+          set({ user: null, isAuthenticated: false });
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     })();
