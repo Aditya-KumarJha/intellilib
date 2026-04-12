@@ -1,5 +1,14 @@
-import LibrarianOverviewContent from "@/components/dashboard/LibrarianOverviewContent";
+import LibrarianDashboardPage from "@/pages/LibrarianDashboardPage";
+import { buildMetadata } from "@/lib/seo";
 
-export default function LibrarianDashboardPage() {
-  return <LibrarianOverviewContent />;
+export const metadata = buildMetadata({
+  title: "Librarian Dashboard",
+  description:
+    "Librarian operations hub for circulation, inventory health, member activity, and service workflows.",
+  path: "/dashboard/librarian",
+  noIndex: true,
+});
+
+export default function RouteWrapper() {
+  return <LibrarianDashboardPage />;
 }

@@ -40,7 +40,7 @@ export default function DashboardSectionPlaceholder({
           <div className="mt-4 min-w-0 sm:mt-0">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
             <p className="mt-2 text-foreground/65">{description}</p>
-            <p className="mt-4 rounded-xl border border-dashed border-black/15 bg-black/[0.02] px-4 py-3 text-sm text-foreground/55 dark:border-white/15 dark:bg-white/[0.03]">
+            <p className="mt-4 rounded-xl border border-dashed border-black/15 bg-black/2 px-4 py-3 text-sm text-foreground/55 dark:border-white/15 dark:bg-white/3">
               This area is static for now. Next steps: wire Supabase queries, realtime channels, and
               AI flows—then swap this placeholder for the live experience.
             </p>
