@@ -183,7 +183,8 @@ const AiSmartDiscovery = () => {
   ];
 
   return (
-    <section className="relative py-8 overflow-hidden">
+    <section id="ai-assistant" className="relative py-8 overflow-hidden scroll-mt-24">
+      <span id="smart-search" className="absolute -top-24" aria-hidden="true" />
       <div className="absolute inset-0 -z-10 bg-(--ai-section-bg)" />
       <div className="absolute -left-28 top-8 h-105 w-105 rounded-full bg-[radial-gradient(circle_at_center,var(--ai-glow-left),transparent_70%)] blur-3xl opacity-80" />
       <div className="absolute -right-28 top-16 h-105 w-105 rounded-full bg-[radial-gradient(circle_at_center,var(--ai-glow-right),transparent_70%)] blur-3xl opacity-80" />

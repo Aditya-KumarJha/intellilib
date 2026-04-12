@@ -72,7 +72,7 @@ const Contact = () => {
   };
 
   return (
-    <section id="contact" className="flex-center section-padding contact-section">
+    <section id="contact" className="flex-center section-padding contact-section scroll-mt-24">
       <div className="h-full w-full px-5 md:px-10">
         <TitleHeader
           title="Request books, explore features, get help"

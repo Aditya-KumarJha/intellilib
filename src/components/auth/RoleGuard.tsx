@@ -35,7 +35,17 @@ export default function RoleGuard({ allowedRole, children }: RoleGuardProps) {
           return;
         }
 
-        const role = (data.user.user_metadata?.role || "user") as UserData["role"];
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user.id)
+          .single();
+
+        if (profileError) {
+          throw profileError;
+        }
+
+        const role = (profileData?.role || "user") as UserData["role"];
         setUserData({ role });
 
         if (role !== allowedRole) {
@@ -46,7 +56,7 @@ export default function RoleGuard({ allowedRole, children }: RoleGuardProps) {
           setIsAuthorized(false);
 
           setTimeout(() => {
-            router.replace("/");
+            router.replace(`/dashboard/${role}`);
           }, 3000);
           return;
         }

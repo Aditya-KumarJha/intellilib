@@ -29,7 +29,9 @@ const HomePage = () => {
   return (
     <div>
       <Navbar />
-      <HeroSlider />
+      <section id="home" className="scroll-mt-24">
+        <HeroSlider />
+      </section>
       <UseCase />
       <AiSmartDiscovery />
       <Testimonials />
