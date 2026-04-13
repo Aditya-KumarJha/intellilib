@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 
 import DashboardSectionPlaceholder from "@/components/dashboard/DashboardSectionPlaceholder";
+import UserMyBooksSection from "@/components/dashboard/user/my-books/UserMyBooksSection";
+import UserSmartSearchSection from "@/components/dashboard/user/search/UserSmartSearchSection";
 import { getSectionMeta, isValidDashboardSection } from "@/lib/dashboardNav";
 
 type PageProps = {
@@ -16,6 +18,14 @@ export default async function UserDashboardSectionPage({ params }: PageProps) {
   const meta = getSectionMeta("user", section);
   if (!meta) {
     notFound();
+  }
+
+  if (section === "search") {
+    return <UserSmartSearchSection />;
+  }
+
+  if (section === "my-books") {
+    return <UserMyBooksSection />;
   }
 
   return (
