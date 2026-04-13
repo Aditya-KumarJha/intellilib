@@ -149,7 +149,6 @@ async function listAllAuthUsers() {
 }
 
 async function cleanAllRelationalData() {
-  console.log("Cleaning relational tables...");
 
   // Child-first delete order based on FKs.
   let error;
@@ -189,7 +188,6 @@ async function cleanAllRelationalData() {
 }
 
 async function cleanSeededAuthUsers() {
-  console.log("Deleting previously seeded auth users...");
   const allUsers = await listAllAuthUsers();
   const emailSet = new Set(USERS_TO_SEED.map((u) => u.email.toLowerCase()));
 
@@ -586,7 +584,6 @@ async function insertSystemSettings() {
 }
 
 async function seed() {
-  console.log("Clean seeding started...");
 
   await cleanAllRelationalData();
   await cleanSeededAuthUsers();
@@ -617,7 +614,7 @@ async function seed() {
   await insertAiQueries(members);
   await insertAuditLogs(admin, librarian, transactions);
 
-  console.log("Clean seeding completed successfully.");
+  
 }
 
 seed().catch((error) => {

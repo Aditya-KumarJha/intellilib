@@ -1,6 +1,6 @@
 import { AlertTriangle, BookOpen, CalendarClock, Library, Link as LinkIcon } from "lucide-react";
 
-import { formatDate, getDaysLabel, getIssueVisualStatus } from "@/components/dashboard/user/my-books/my-books-utils";
+import { formatDate, getDaysLabel, getIssueVisualStatus, formatCurrency } from "@/components/dashboard/user/my-books/my-books-utils";
 import type { MyBookIssue } from "@/components/dashboard/user/my-books/types";
 
 type MyBookIssueCardProps = {
@@ -67,10 +67,19 @@ export default function MyBookIssueCard({ issue }: MyBookIssueCardProps) {
             ) : null}
 
             {issue.fineAmount > 0 ? (
-              <p className="inline-flex items-center gap-1.5 sm:col-span-2 text-red-600 dark:text-red-300">
-                <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-                Fine due: Rs. {issue.fineAmount}
-              </p>
+              issue.finePaid ? (
+                <p className="inline-flex items-center gap-2 sm:col-span-2 text-foreground/70">
+                  <AlertTriangle className="h-3.5 w-3.5 text-emerald-500" aria-hidden />
+                  <span className="line-through text-foreground/60">Fine due: {formatCurrency(issue.fineAmount)}</span>
+                  <span className="ml-2 rounded-md bg-emerald-600/10 px-2 py-0.5 text-xs font-medium text-emerald-600">Paid</span>
+                  {issue.finePaidAt ? <span className="ml-2 text-xs text-foreground/60">on {formatDate(issue.finePaidAt)}</span> : null}
+                </p>
+              ) : (
+                <p className="inline-flex items-center gap-1.5 sm:col-span-2 text-red-600 dark:text-red-300">
+                  <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+                  Fine due: {formatCurrency(issue.fineAmount)}
+                </p>
+              )
             ) : null}
           </div>
 

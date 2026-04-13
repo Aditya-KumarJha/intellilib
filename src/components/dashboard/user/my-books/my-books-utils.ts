@@ -64,6 +64,15 @@ export function formatDate(date: string | null): string {
   return new Date(date).toLocaleDateString();
 }
 
+export function formatCurrency(amount: number | string | null | undefined): string {
+  const value = Number(amount || 0);
+  try {
+    return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
+  } catch (e) {
+    return `Rs. ${Math.round(value)}`;
+  }
+}
+
 export function buildMyBooksStats(issues: MyBookIssue[]): MyBooksStats {
   return issues.reduce<MyBooksStats>(
     (acc, issue) => {

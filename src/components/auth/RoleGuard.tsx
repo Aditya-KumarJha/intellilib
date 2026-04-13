@@ -49,9 +49,6 @@ export default function RoleGuard({ allowedRole, children }: RoleGuardProps) {
         setUserData({ role });
 
         if (role !== allowedRole) {
-          console.log(
-            `Access denied: User role '${role}' doesn't match required role '${allowedRole}'`
-          );
           setError(`Access Denied: This dashboard is only accessible to ${allowedRole}s.`);
           setIsAuthorized(false);
 

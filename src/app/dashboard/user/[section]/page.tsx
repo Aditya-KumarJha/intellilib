@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import DashboardSectionPlaceholder from "@/components/dashboard/DashboardSectionPlaceholder";
 import UserMyBooksSection from "@/components/dashboard/user/my-books/UserMyBooksSection";
 import UserSmartSearchSection from "@/components/dashboard/user/search/UserSmartSearchSection";
+import UserFinesSection from "@/components/dashboard/user/fines/UserFinesSection";
 import { getSectionMeta, isValidDashboardSection } from "@/lib/dashboardNav";
 
 type PageProps = {
@@ -26,6 +27,20 @@ export default async function UserDashboardSectionPage({ params }: PageProps) {
 
   if (section === "my-books") {
     return <UserMyBooksSection />;
+  }
+
+  if (section === "fines") {
+    return <UserFinesSection />;
+  }
+
+  if (section === "notifications") {
+    const NotificationsSection = (await import("@/components/dashboard/user/notifications/NotificationsSection")).default;
+    return <NotificationsSection />;
+  }
+
+  if (section === "history") {
+    const UserHistorySection = (await import("@/components/dashboard/user/history/UserHistorySection")).default;
+    return <UserHistorySection />;
   }
 
   return (

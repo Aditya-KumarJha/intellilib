@@ -62,6 +62,8 @@ export default function UserSmartSearchSection() {
   const [activeFormat, setActiveFormat] = useState<SearchFormatFilter>("all");
   const [sortBy, setSortBy] = useState<SearchSortOption>("latest");
   const [books, setBooks] = useState<SmartSearchBook[]>([]);
+  const [totalBooksCount, setTotalBooksCount] = useState<number | null>(null);
+  const [totalCopiesAvailable, setTotalCopiesAvailable] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,18 +131,74 @@ export default function UserSmartSearchSection() {
     [query, activeFormat]
   );
 
+    // fetch overall totals (books matching filters and available copies) separately
+    const fetchTotals = useCallback(async () => {
+      try {
+        const q = query.trim();
+
+        let builder = supabase
+          .from("books")
+          .select("id");
+
+        if (activeFormat === "digital") {
+          builder = builder.in("type", ["digital", "both"]);
+        } else if (activeFormat === "physical") {
+          builder = builder.in("type", ["physical", "both"]);
+        }
+
+        if (q.length >= 3) {
+          const like = `%${q}%`;
+          builder = builder.or(`title.ilike.${like},author.ilike.${like},isbn.ilike.${like}`);
+        }
+
+        // request a large range of ids so we can count copies reliably
+        const { data: idRows, error: idErr } = await builder.range(0, 99999);
+        if (idErr) {
+          setTotalBooksCount(null);
+          setTotalCopiesAvailable(null);
+          return;
+        }
+
+        const ids = (idRows ?? []).map((r: any) => r.id);
+        setTotalBooksCount(ids.length);
+
+        if (ids.length === 0) {
+          setTotalCopiesAvailable(0);
+          return;
+        }
+
+        const { count: copiesCount, error: copiesErr } = await supabase
+          .from("book_copies")
+          .select("id", { count: "exact", head: true })
+          .in("book_id", ids)
+          .eq("status", "available");
+
+        if (copiesErr) {
+          setTotalCopiesAvailable(null);
+          return;
+        }
+
+        setTotalCopiesAvailable(copiesCount ?? 0);
+      } catch (e) {
+        setTotalBooksCount(null);
+        setTotalCopiesAvailable(null);
+      }
+    }, [query, activeFormat]);
+
   useEffect(() => {
     // initial load or when query/format changes
     pageRef.current = 0;
 
     const initialLoadHandle = window.setTimeout(() => {
       void loadBooks(0, false);
+      void fetchTotals();
     }, 0);
 
     return () => {
       window.clearTimeout(initialLoadHandle);
     };
-  }, [loadBooks]);
+  }, [loadBooks, fetchTotals]);
+  
 
   useEffect(() => {
     const onScroll = () => {
@@ -178,10 +236,10 @@ export default function UserSmartSearchSection() {
           </div>
 
           <div className="rounded-2xl border border-black/10 bg-white/70 px-4 py-3 text-right text-xs dark:border-white/10 dark:bg-white/10">
-            <p className="text-foreground/60">Books shown</p>
-            <p className="text-lg font-semibold text-foreground">{filtered.length}</p>
-            <p className="text-foreground/55">{totalAvailable} copies available</p>
-          </div>
+              <p className="text-foreground/60">Books shown</p>
+              <p className="text-lg font-semibold text-foreground">{totalBooksCount ?? filtered.length}</p>
+              <p className="text-foreground/55">{totalCopiesAvailable ?? totalAvailable} copies available</p>
+            </div>
         </div>
 
         <div className="mt-5 space-y-3">

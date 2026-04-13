@@ -1,6 +1,7 @@
 import { AlertTriangle, BookCheck, BookOpenCheck, Wallet } from "lucide-react";
 
 import type { MyBooksStats } from "@/components/dashboard/user/my-books/types";
+import { formatCurrency } from "@/components/dashboard/user/my-books/my-books-utils";
 
 type MyBooksStatsRowProps = {
   stats: MyBooksStats;
@@ -82,7 +83,7 @@ export default function MyBooksStatsRow({ stats, onSelect, active }: MyBooksStat
       />
       <StatCard
         label="Fine Due"
-        value={`Rs. ${stats.dueFineAmount}`}
+        value={formatCurrency(stats.dueFineAmount)}
         icon={<Wallet className="h-5 w-5 text-amber-700 dark:text-amber-300" />}
         tone="amber"
         onClick={() => onSelect?.("fine")}

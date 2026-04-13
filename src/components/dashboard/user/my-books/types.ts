@@ -70,6 +70,8 @@ export type MyBookIssue = {
   returnDate: string | null;
   status: "issued" | "returned" | "overdue";
   fineAmount: number;
+  finePaid?: boolean;
+  finePaidAt?: string | null;
   copyType: "physical" | "digital";
   copyStatus: string;
   location: string | null;

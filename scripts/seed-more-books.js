@@ -177,7 +177,6 @@ async function insertBooksIfNeeded() {
   const existingCount = await getBookCount();
 
   if (existingCount >= MIN_BOOK_COUNT) {
-    console.log(`Books already >= ${MIN_BOOK_COUNT}. Current count: ${existingCount}`);
     return 0;
   }
 
@@ -189,7 +188,7 @@ async function insertBooksIfNeeded() {
     .upsert(payload, { onConflict: "isbn", ignoreDuplicates: false });
   assertNoError(error, "upsert books");
 
-  console.log(`Inserted/upserted ${toCreate} books.`);
+  
   return toCreate;
 }
 
@@ -377,7 +376,6 @@ async function createTransactionAndUpdateCopy({ userId, copy, status, index }) {
 async function seedUserTransactions(userId) {
   const settledCount = await settleExistingOpenOverdues(userId);
   if (settledCount > 0) {
-    console.log(`Settled ${settledCount} pre-existing open overdue transactions for target user.`);
   }
 
   const candidates = await fetchCandidateBooks(180);
@@ -421,11 +419,11 @@ async function seedUserTransactions(userId) {
     );
   }
 
-  console.log(`Created ${created} transactions for target user ${TARGET_USER_EMAIL}.`);
+  
 }
 
 async function main() {
-  console.log("Starting additive bulk seed...");
+  
 
   await insertBooksIfNeeded();
 
@@ -433,7 +431,7 @@ async function main() {
   await seedUserTransactions(userId);
 
   const finalCount = await getBookCount();
-  console.log(`Done. Total books in table: ${finalCount}.`);
+  
 }
 
 main().catch((error) => {

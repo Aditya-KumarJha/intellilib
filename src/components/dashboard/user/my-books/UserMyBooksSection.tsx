@@ -63,6 +63,37 @@ export default function UserMyBooksSection() {
         .map(mapMyBookIssueRow)
         .filter((row): row is MyBookIssue => Boolean(row));
 
+      // fetch any paid fines linked to these transactions so we can show paid state in MyBooks
+      try {
+        const txIds = mapped.map((m) => m.id).filter(Boolean);
+        if (txIds.length > 0) {
+          const { data: finesData } = await supabase
+            .from("fines")
+            .select("transaction_id,paid_at")
+            .in("transaction_id", txIds)
+            .eq("user_id", currentUserId);
+
+          const paidMap = new Map<number, string | null>();
+          (finesData ?? []).forEach((f: any) => {
+            // prefer the latest paid_at if multiple
+            const tx = Number(f.transaction_id);
+            const prev = paidMap.get(tx);
+            const cur = f.paid_at ?? null;
+            if (!prev && cur) paidMap.set(tx, cur);
+            if (prev && cur && new Date(cur).getTime() > new Date(prev).getTime()) paidMap.set(tx, cur);
+          });
+
+          // attach fine paid info
+          for (const m of mapped) {
+            const paidAt = paidMap.get(m.id as number) ?? null;
+            (m as any).finePaid = !!paidAt;
+            (m as any).finePaidAt = paidAt;
+          }
+        }
+      } catch (e) {
+        // ignore fines fetch errors — non-critical
+      }
+
       setIssues((prev) => (append ? [...prev, ...mapped] : mapped));
       setHasMore((data?.length ?? 0) === PAGE_SIZE);
       setRefreshing(false);
@@ -112,9 +143,10 @@ export default function UserMyBooksSection() {
           filter: `user_id=eq.${currentUserId}`,
         },
         () => {
-          // reload first page on realtime events
+          // reload first page on realtime events and refresh server stats
           setPage(0);
           void loadMyBooks(0, false);
+          void fetchServerStats();
         }
       )
       .subscribe();
@@ -134,41 +166,64 @@ export default function UserMyBooksSection() {
     if (!currentUserId) return;
 
     try {
-      const issuedRes = await supabase
-        .from("transactions")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", currentUserId)
-        .eq("status", "issued");
+      const [issuedRes, overdueRes, returnedRes, finesSumRes, txFinesRes] = await Promise.all([
+        supabase.from("transactions").select("id", { count: "exact", head: true }).eq("user_id", currentUserId).eq("status", "issued"),
+        supabase.from("transactions").select("id", { count: "exact", head: true }).eq("user_id", currentUserId).eq("status", "overdue"),
+        supabase.from("transactions").select("id", { count: "exact", head: true }).eq("user_id", currentUserId).eq("status", "returned"),
+        // sum unpaid fines from fines table
+        supabase.from("fines").select("sum(amount)").eq("user_id", currentUserId).is("paid_at", null),
+        // sum fine_amount on overdue active transactions
+        supabase.from("transactions").select("sum(fine_amount)").eq("user_id", currentUserId).eq("status", "overdue").is("return_date", null),
+      ]);
 
-      const overdueRes = await supabase
-        .from("transactions")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", currentUserId)
-        .eq("status", "overdue");
+      if (issuedRes.error || overdueRes.error || returnedRes.error || finesSumRes.error || txFinesRes.error) {
+        // fallback: fetch rows and count client-side
+        const [issuedRows, overdueRows, returnedRows, finesRows, txFinesRows] = await Promise.all([
+          supabase.from("transactions").select("id").eq("user_id", currentUserId).eq("status", "issued"),
+          supabase.from("transactions").select("id").eq("user_id", currentUserId).eq("status", "overdue"),
+          supabase.from("transactions").select("id").eq("user_id", currentUserId).eq("status", "returned"),
+          supabase.from("fines").select("amount").eq("user_id", currentUserId).is("paid_at", null),
+          supabase.from("transactions").select("sum(fine_amount)").eq("user_id", currentUserId).eq("status", "overdue").is("return_date", null),
+        ]);
 
-      const returnedRes = await supabase
-        .from("transactions")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", currentUserId)
-        .eq("status", "returned");
+        const activeCount = Array.isArray(issuedRows.data) ? issuedRows.data.length : 0;
+        const overdueCount = Array.isArray(overdueRows.data) ? overdueRows.data.length : 0;
+        const returnedCount = Array.isArray(returnedRows.data) ? returnedRows.data.length : 0;
+        const unpaidFines = Array.isArray(finesRows.data) ? finesRows.data.reduce((s: number, r: any) => s + Number(r.amount || 0), 0) : 0;
+        let txFines = 0;
+        if (Array.isArray(txFinesRows.data) && txFinesRows.data.length > 0) {
+          const row = txFinesRows.data[0] as any;
+          const key = Object.keys(row)[0];
+          const raw = row[key];
+          txFines = raw == null ? 0 : Number(raw);
+        }
 
-      // try aggregate fine sum
-      const fineRes = await supabase.from("transactions").select("sum(fine_amount)").eq("user_id", currentUserId);
+        const dueFineAmount = unpaidFines + txFines;
+        setServerStats({ activeCount, overdueCount, returnedCount, dueFineAmount });
+        return;
+      }
 
-      const activeCount = (issuedRes.count as number) || 0;
-      const overdueCount = (overdueRes.count as number) || 0;
-      const returnedCount = (returnedRes.count as number) || 0;
+      const activeCount = Number(issuedRes.count ?? 0);
+      const overdueCount = Number(overdueRes.count ?? 0);
+      const returnedCount = Number(returnedRes.count ?? 0);
+
+      // combine unpaid fines table + any calculated fines on active overdue transactions
       let dueFineAmount = 0;
-      if (Array.isArray(fineRes.data) && fineRes.data.length > 0) {
-        // PostgREST returns { sum: '123' } or { sum: null }
-        const key = Object.keys(fineRes.data[0])[0];
-        const raw = (fineRes.data[0] as any)[key];
-        dueFineAmount = raw ? Number(raw) : 0;
+      if (Array.isArray(finesSumRes.data) && finesSumRes.data.length > 0) {
+        const row = finesSumRes.data[0] as any;
+        const key = Object.keys(row)[0];
+        const raw = row[key];
+        dueFineAmount += raw == null ? 0 : Number(raw);
+      }
+      if (Array.isArray(txFinesRes.data) && txFinesRes.data.length > 0) {
+        const row = txFinesRes.data[0] as any;
+        const key = Object.keys(row)[0];
+        const raw = row[key];
+        dueFineAmount += raw == null ? 0 : Number(raw);
       }
 
       setServerStats({ activeCount, overdueCount, returnedCount, dueFineAmount });
     } catch (e) {
-      // ignore, we'll fallback to local counts
       setServerStats(null);
     }
   }, [currentUserId]);
@@ -179,11 +234,18 @@ export default function UserMyBooksSection() {
     setActiveFilter(filter);
     setPage(0);
     setIssues([]);
-    void loadMyBooks(0, false);
   }
 
   useEffect(() => {
     void fetchServerStats();
+  }, [currentUserId, fetchServerStats]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    const id = window.setInterval(() => {
+      void fetchServerStats();
+    }, 30000);
+    return () => window.clearInterval(id);
   }, [currentUserId, fetchServerStats]);
 
   useEffect(() => {
@@ -205,7 +267,10 @@ export default function UserMyBooksSection() {
 
           <button
             type="button"
-            onClick={() => void loadMyBooks()}
+            onClick={() => {
+              void loadMyBooks();
+              void fetchServerStats();
+            }}
             disabled={loading || refreshing}
             className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white/75 px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/10 dark:hover:bg-white/15"
           >
