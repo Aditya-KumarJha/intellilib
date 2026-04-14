@@ -6,7 +6,7 @@ import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { z } from "zod";
 
 import { getUserFromRequest } from "@/lib/server/apiAuth";
-import { notifyUserById } from "@/lib/server/libraryNotifications";
+import { notifyUserById, insertNotificationRows } from "@/lib/server/libraryNotifications";
 import {
   compactQueuePositions,
   getApprovedReservationForUser,
@@ -598,11 +598,18 @@ async function createReturnRequest(
   if (Array.isArray(staff) && staff.length > 0) {
     const inserts = (staff as StaffProfile[]).map((staffUser) => ({
       user_id: staffUser.id,
-      type: "reservation_update" as const,
+      type: "return_request",
       message,
       is_read: false,
+      target_role: "librarian",
+      metadata: {
+        requested_by: userId,
+        requested_email: emailOrId,
+        transactionId: transactionId,
+        bookTitle,
+      },
     }));
-    await supabaseAdmin.from("notifications").insert(inserts);
+    await insertNotificationRows(inserts);
   }
 
   await notifyUserById(userId, {

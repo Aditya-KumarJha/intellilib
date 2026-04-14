@@ -15,12 +15,41 @@ type MailJob = {
 export type NotificationType = "due_reminder" | "fine_alert" | "payment_success" | "reservation_update";
 
 export async function createInAppNotification(userId: string, message: string) {
-  await supabaseAdmin.from("notifications").insert({
+  await insertNotificationRows({
     user_id: userId,
     type: "reservation_update",
     message,
     is_read: false,
+    target_role: "user",
   });
+}
+
+// Helper that attempts to insert notification rows with optional fields like `target_role` and `metadata`.
+// If the DB doesn't have those columns yet, it will retry without them to remain backward compatible.
+export async function insertNotificationRows(rows: Record<string, any> | Record<string, any>[]) {
+  const payload = Array.isArray(rows) ? rows : [rows];
+  try {
+    await supabaseAdmin.from("notifications").insert(payload);
+    return;
+  } catch (err: any) {
+    // If column does not exist (42703), retry without `target_role` and `metadata` fields
+    if (err?.code === "42703" || (typeof err?.message === "string" && err.message.includes("column") && err.message.includes("does not exist"))) {
+      const cleaned = payload.map((r) => {
+        const copy = { ...r };
+        delete copy.target_role;
+        delete copy.metadata;
+        return copy;
+      });
+      try {
+        await supabaseAdmin.from("notifications").insert(cleaned);
+        return;
+      } catch (err2) {
+        // rethrow second error
+        throw err2;
+      }
+    }
+    throw err;
+  }
 }
 
 export async function queueMail(job: MailJob) {
@@ -70,13 +99,16 @@ export async function notifyUserById(
     html: string;
     text: string;
     type?: NotificationType;
+    metadata?: any;
   },
 ) {
-  await supabaseAdmin.from("notifications").insert({
+  await insertNotificationRows({
     user_id: userId,
     type: payload.type ?? "reservation_update",
     message: payload.inAppMessage,
     is_read: false,
+    target_role: "user",
+    metadata: payload.metadata ?? null,
   });
 
   const { data } = await supabaseAdmin.auth.admin.getUserById(userId);

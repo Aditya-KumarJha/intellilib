@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import type { LucideIcon } from "lucide-react";
+import * as Icons from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -9,7 +9,8 @@ type DashboardStatCardProps = {
   label: string;
   value: string;
   hint?: string;
-  icon: LucideIcon;
+  // Accept either a Lucide icon component or the icon's name (string) when passed from server components
+  icon?: any;
   tone?: "violet" | "cyan" | "emerald" | "amber" | "rose";
   delay?: number;
 };
@@ -34,10 +35,11 @@ export default function DashboardStatCard({
   label,
   value,
   hint,
-  icon: Icon,
+  icon,
   tone = "violet",
   delay = 0,
 }: DashboardStatCardProps) {
+  const Icon = typeof icon === "string" ? (Icons as any)[icon] ?? null : icon ?? null;
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -61,7 +63,7 @@ export default function DashboardStatCard({
             toneIcon[tone]
           )}
         >
-          <Icon className="h-5 w-5" aria-hidden />
+          {Icon ? <Icon className="h-5 w-5" aria-hidden /> : null}
         </span>
       </div>
     </motion.div>

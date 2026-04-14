@@ -158,7 +158,7 @@ export default function UserHistorySection() {
             <div key={n.id} className="w-full min-w-0 rounded-2xl border p-3 bg-white/5">
               <div className="min-w-0">
                 <p className="font-semibold text-sm">{(n.type ?? "Item").replace(/_/g, " ")}</p>
-                <p className="mt-1 text-sm text-foreground/65 line-clamp-3 break-words">{n.message}</p>
+                <p className="mt-1 text-sm text-foreground/65 line-clamp-3 wrap-break-word">{n.message}</p>
                 <p className="mt-2 text-xs text-foreground/60">{formatDate(n.created_at)}</p>
               </div>
             </div>

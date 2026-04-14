@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getUserFromRequest } from "@/lib/server/apiAuth";
 import { logAuditEvent } from "@/lib/server/auditLogs";
-import { notifyUserById } from "@/lib/server/libraryNotifications";
+import { notifyUserById, insertNotificationRows } from "@/lib/server/libraryNotifications";
 import supabaseAdmin from "@/lib/supabaseServerClient";
 
 type ReturnBody = {
@@ -103,11 +103,18 @@ export async function POST(req: Request) {
     if (Array.isArray(staff) && staff.length > 0) {
       const inserts = (staff as StaffProfile[]).map((staffUser) => ({
         user_id: staffUser.id,
-        type: "reservation_update" as const,
+        type: "return_request",
         message,
         is_read: false,
+        target_role: "librarian",
+        metadata: {
+          requested_by: user.id,
+          requested_email: user.email,
+          transactionId: txId,
+          bookTitle,
+        },
       }));
-      await supabaseAdmin.from("notifications").insert(inserts);
+      await insertNotificationRows(inserts);
     }
 
     // also notify the requesting user

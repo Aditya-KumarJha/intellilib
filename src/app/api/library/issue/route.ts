@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getUserFromRequest } from "@/lib/server/apiAuth";
 import { logAuditEvent } from "@/lib/server/auditLogs";
-import { notifyUserById } from "@/lib/server/libraryNotifications";
+import { notifyUserById, insertNotificationRows } from "@/lib/server/libraryNotifications";
 import {
   compactQueuePositions,
   getApprovedReservationForUser,
@@ -243,6 +243,39 @@ export async function POST(req: Request) {
     text: `Your book "${bookRow.title}" has been issued. Please bring your ID card and collect it from the counter. Due date: ${dueText}.`,
     html: `<p>Your book <strong>${bookRow.title}</strong> has been issued.</p><p>Please bring your ID card and collect it from the library counter.</p><p><strong>Due date:</strong> ${dueText}</p>`,
   });
+
+  // Create librarian-targeted notifications so staff see the issuance in their dashboard
+  try {
+    const message = `${user.email ?? user.id} issued ${bookRow.title} (tx:${inserted.id}).`;
+    const { data: staff } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .in("role", ["librarian", "admin"]);
+
+    if (Array.isArray(staff) && staff.length > 0) {
+      const inserts = (staff as { id: string }[]).map((s) => ({
+        user_id: s.id,
+        type: "book_issued",
+        message,
+        is_read: false,
+        target_role: "librarian",
+        metadata: {
+          transactionId: inserted.id,
+          userId: user.id,
+          userEmail: user.email,
+          bookId,
+          copyId: inserted.book_copy_id,
+          dueDate,
+        },
+      }));
+
+      await insertNotificationRows(inserts);
+    }
+  } catch (err) {
+    // non-fatal: log and continue
+    // eslint-disable-next-line no-console
+    console.error("[issue.route] failed to create librarian notifications:", err);
+  }
 
   await logAuditEvent({
     userId: user.id,
