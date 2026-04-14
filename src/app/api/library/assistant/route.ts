@@ -178,6 +178,47 @@ const LOANS_OVERVIEW_HINTS = [
   "books due this week",
 ];
 
+const ACTION_HINTS = [
+  "issue",
+  "reserve",
+  "return",
+  "borrow",
+  "renew",
+  "hold",
+  "pickup",
+  "request",
+  "borrow",
+];
+
+function isActionIntent(text: string): boolean {
+  const normalized = normalizeText(text);
+  if (!normalized) return false;
+
+  // If the user is asking an informational question (what/which/show/tell/do/have), treat as non-action.
+  const infoIndicators = ["what", "which", "do i", "have i", "show me", "tell me", "can you tell", "list my", "which books", "what books", "how many"];
+  for (const ind of infoIndicators) {
+    if (normalized.includes(ind)) return false;
+  }
+
+  // Explicit action request patterns: imperative or polite requests to perform action.
+  const explicitActionPhrases = ["please issue", "issue me", "can you issue", "could you issue", "please reserve", "reserve me", "can you reserve", "please return", "return my", "please return"];
+  for (const p of explicitActionPhrases) {
+    if (normalized.includes(p)) return true;
+  }
+
+  // If message starts with an action verb (imperative) treat as action.
+  for (const hint of ACTION_HINTS) {
+    if (normalized.startsWith(hint + " ")) return true;
+  }
+
+  // If message contains an action verb together with direct-object markers like 'me' or 'now', treat as action.
+  for (const hint of ACTION_HINTS) {
+    if (normalized.includes(hint) && /\b(me|for me|now|please|asap|immediately)\b/.test(normalized)) return true;
+  }
+
+  return false;
+}
+
 const SYSTEM_PROMPT = `You are IntelliLib Assistant, a strict domain assistant for the IntelliLib platform.
 
 Rules:
@@ -685,6 +726,11 @@ function createTools(userId: string) {
       }
 
       const book = resolved.best;
+      // If user's account is suspended, do not perform issue — just inform the user.
+      const { data: profileRow } = await supabaseAdmin.from("profiles").select("status").eq("id", userId).maybeSingle();
+      if (profileRow?.status === "suspended") {
+        return "Your account is suspended. I cannot issue books while your account is suspended. Please contact library staff to request reactivation.";
+      }
       if (resolved.score < 0.72) {
         return `I found close match "${book.title}" but confidence is low. Ask again with exact title to issue this book.`;
       }
@@ -774,6 +820,7 @@ function createTools(userId: string) {
       }
 
       const dueText = new Date(dueDate).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
         dateStyle: "medium",
         timeStyle: "short",
       });
@@ -822,6 +869,11 @@ function createTools(userId: string) {
       }
 
       const book = resolved.best;
+      // If user's account is suspended, do not create reservations — just inform the user.
+      const { data: profileRow } = await supabaseAdmin.from("profiles").select("status").eq("id", userId).maybeSingle();
+      if (profileRow?.status === "suspended") {
+        return "Your account is suspended. I cannot create reservations while your account is suspended. Please contact library staff to request reactivation.";
+      }
       if (resolved.score < 0.72) {
         return `I found close match "${book.title}" but confidence is low. Ask again with exact title to reserve this book.`;
       }
@@ -931,6 +983,12 @@ function createTools(userId: string) {
       }
 
       const activeLoans = (data ?? []) as unknown as ActiveLoanRow[];
+      // If user's account is suspended, do not create return requests — just inform the user.
+      const { data: profileRow } = await supabaseAdmin.from("profiles").select("status").eq("id", userId).maybeSingle();
+      const isSuspended = profileRow?.status === "suspended";
+      if (isSuspended) {
+        return "Your account is suspended. I cannot process return requests while your account is suspended. Please contact library staff to request reactivation.";
+      }
       if (activeLoans.length === 0) {
         return "You do not have any active loans to return.";
       }
@@ -954,14 +1012,20 @@ function createTools(userId: string) {
         }
 
         if (createdCount === 0 && alreadyPendingCount > 0) {
-          return "Return request already in process for your active loans. A librarian will process them shortly.";
+          return isSuspended
+            ? "Your account is suspended. Return requests are already in process for your active loans. A librarian will process them shortly."
+            : "Return request already in process for your active loans. A librarian will process them shortly.";
         }
 
         if (alreadyPendingCount > 0) {
-          return `Return requested for ${createdCount} active loan(s). ${alreadyPendingCount} already in process.`;
+          return isSuspended
+            ? `Your account is suspended. Return requested for ${createdCount} active loan(s). ${alreadyPendingCount} already in process. A librarian will process them when appropriate.`
+            : `Return requested for ${createdCount} active loan(s). ${alreadyPendingCount} already in process.`;
         }
 
-        return `Return requested for ${activeLoans.length} active loan(s). A librarian will process them shortly.`;
+        return isSuspended
+          ? `Your account is suspended. Return requested for ${activeLoans.length} active loan(s). A librarian will process them when appropriate.`
+          : `Return requested for ${activeLoans.length} active loan(s). A librarian will process them shortly.`;
       }
 
       const ranked = activeLoans
@@ -987,10 +1051,14 @@ function createTools(userId: string) {
       const returnRequestStatus = await createReturnRequest(userId, emailOrId, best.loan.id, title);
 
       if (returnRequestStatus === "already_pending") {
-        return `Return request already in process for ${title}. A librarian will process it shortly.`;
+        return isSuspended
+          ? `Your account is suspended. Return request already in process for ${title}. A librarian will process it when appropriate.`
+          : `Return request already in process for ${title}. A librarian will process it shortly.`;
       }
 
-      return `Return requested for ${title}. A librarian will process it shortly.`;
+      return isSuspended
+        ? `Your account is suspended. Return requested for ${title}. A librarian will process it when appropriate.`
+        : `Return requested for ${title}. A librarian will process it shortly.`;
     },
     {
       name: "return_book",
@@ -1084,6 +1152,13 @@ export async function POST(req: Request) {
     .slice(-MAX_HISTORY);
 
   const latestUserMessage = [...messages].reverse().find((msg) => msg.role === "user")?.content?.trim() ?? "";
+
+  // Early guard: if user is suspended and the latest message is an action (issue/reserve/return), block immediately.
+  const maybeProfile = await supabaseAdmin.from("profiles").select("status").eq("id", user.id).maybeSingle();
+  const userStatus = maybeProfile?.data?.status ?? maybeProfile?.status ?? (maybeProfile as any)?.data?.status;
+  if (userStatus === "suspended" && isActionIntent(latestUserMessage)) {
+    return NextResponse.json({ ok: true, reply: "Your account is suspended. I cannot perform issue, reservation, or return actions while your account is suspended. Please contact library staff to request reactivation." });
+  }
 
   if (!latestUserMessage) {
     return NextResponse.json({ ok: true, reply: "Please ask a library-related question." });

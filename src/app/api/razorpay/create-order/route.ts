@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getUserFromRequest } from "@/lib/server/apiAuth";
 import { logAuditEvent } from "@/lib/server/auditLogs";
+import { ensureActionAllowedForUser } from "@/lib/server/suspensionGuard";
 import supabaseAdmin from "@/lib/supabaseServerClient";
 
 type CreateOrderBody = {
@@ -18,6 +19,11 @@ export async function POST(req: Request) {
   const user = await getUserFromRequest(req);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const permission = await ensureActionAllowedForUser(user.id);
+  if (!permission.allowed) {
+    return NextResponse.json({ error: permission.message }, { status: 403 });
   }
 
   const body: CreateOrderBody = await req.json().catch(() => ({}));

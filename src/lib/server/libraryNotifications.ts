@@ -12,6 +12,8 @@ type MailJob = {
   text: string;
 };
 
+type NotificationRowInsert = Record<string, unknown>;
+
 export type NotificationType = "due_reminder" | "fine_alert" | "payment_success" | "reservation_update";
 
 export async function createInAppNotification(userId: string, message: string) {
@@ -26,29 +28,36 @@ export async function createInAppNotification(userId: string, message: string) {
 
 // Helper that attempts to insert notification rows with optional fields like `target_role` and `metadata`.
 // If the DB doesn't have those columns yet, it will retry without them to remain backward compatible.
-export async function insertNotificationRows(rows: Record<string, any> | Record<string, any>[]) {
+export async function insertNotificationRows(rows: NotificationRowInsert | NotificationRowInsert[]) {
   const payload = Array.isArray(rows) ? rows : [rows];
-  try {
-    await supabaseAdmin.from("notifications").insert(payload);
-    return;
-  } catch (err: any) {
-    // If column does not exist (42703), retry without `target_role` and `metadata` fields
-    if (err?.code === "42703" || (typeof err?.message === "string" && err.message.includes("column") && err.message.includes("does not exist"))) {
-      const cleaned = payload.map((r) => {
-        const copy = { ...r };
-        delete copy.target_role;
-        delete copy.metadata;
-        return copy;
-      });
-      try {
-        await supabaseAdmin.from("notifications").insert(cleaned);
-        return;
-      } catch (err2) {
-        // rethrow second error
-        throw err2;
-      }
-    }
-    throw err;
+  const primary = await supabaseAdmin.from("notifications").insert(payload);
+  if (!primary.error) return;
+
+  const err = primary.error as { code?: string; message?: string };
+  const msg = typeof err?.message === "string" ? err.message : "";
+  const missingOptionalColumns =
+    err?.code === "42703"
+    || (msg.includes("column") && msg.includes("does not exist"))
+    // Supabase sometimes reports missing columns via schema cache errors like:
+    // "Could not find the 'metadata' column of 'notifications' in the schema cache"
+    || msg.includes("Could not find the '")
+    || msg.includes("schema cache");
+
+  if (!missingOptionalColumns) {
+    throw primary.error;
+  }
+
+  // Fallback for older schemas without optional columns.
+  const cleaned = payload.map((r) => {
+    const copy = { ...r };
+    delete copy.target_role;
+    delete copy.metadata;
+    return copy;
+  });
+
+  const fallback = await supabaseAdmin.from("notifications").insert(cleaned);
+  if (fallback.error) {
+    throw fallback.error;
   }
 }
 
@@ -99,7 +108,7 @@ export async function notifyUserById(
     html: string;
     text: string;
     type?: NotificationType;
-    metadata?: any;
+    metadata?: Record<string, unknown> | null;
   },
 ) {
   await insertNotificationRows({

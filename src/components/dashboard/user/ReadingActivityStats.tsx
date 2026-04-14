@@ -6,6 +6,8 @@ import { BookCheck, Clock3, Target } from "lucide-react";
 import UserPanelCard from "@/components/dashboard/user/UserPanelCard";
 import { supabase } from "@/lib/supabaseClient";
 
+import useAuthStore from "@/lib/authStore";
+
 type ReadingActivityItem = {
   label: string;
   value: string;
@@ -13,6 +15,7 @@ type ReadingActivityItem = {
 };
 
 export default function ReadingActivityStats() {
+  const user = useAuthStore((state) => state.user);
   const [items, setItems] = useState<ReadingActivityItem[]>([
     { label: "Books read this month", value: "0", icon: BookCheck },
     { label: "Avg reading duration", value: "0 days", icon: Clock3 },
@@ -23,8 +26,7 @@ export default function ReadingActivityStats() {
     let mounted = true;
 
     async function load() {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
+      const userId = user?.id;
       if (!userId || !mounted) return;
 
       const monthStart = new Date();
@@ -67,7 +69,7 @@ export default function ReadingActivityStats() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [user?.id]);
 
   const readingActivity = useMemo(() => items, [items]);
 

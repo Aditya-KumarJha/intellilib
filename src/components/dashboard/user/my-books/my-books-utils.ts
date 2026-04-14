@@ -63,7 +63,15 @@ export function getDaysLabel(issue: MyBookIssue): string {
 
 export function formatDate(date: string | null): string {
   if (!date) return "-";
-  return new Date(date).toLocaleDateString();
+  try {
+    return new Date(date).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch {
+    return new Date(date).toLocaleDateString();
+  }
 }
 
 export function formatCurrency(amount: number | string | null | undefined): string {

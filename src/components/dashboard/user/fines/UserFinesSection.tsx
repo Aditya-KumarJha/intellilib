@@ -405,14 +405,14 @@ export default function UserFinesSection() {
                               <p className="truncate font-semibold">{book?.title ?? "Fine"}</p>
                               {book?.author ? <p className="text-sm text-foreground/60">by {book.author}</p> : null}
                               <p className="mt-2 text-xs text-foreground/60">
-                                Issued: {tx?.issue_date ? new Date(tx.issue_date).toLocaleString() : "-"}
+                                Issued: {tx?.issue_date ? new Date(tx.issue_date).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }) : "-"}
                               </p>
                               <p className="text-xs text-foreground/60">
                                 Due: {tx?.due_date ? new Date(tx.due_date).toLocaleDateString() : "-"} • {daysLabelFromTx(tx ?? null)}
                               </p>
                               <p className="mt-2 text-sm text-foreground/70">Status: {isPaid ? "Paid" : fine.status ?? "pending"}</p>
                               <p className="mt-1 text-xs text-foreground/60">
-                                {isPaid ? `Paid on ${new Date(fine.paid_at ?? fine.created_at).toLocaleString()}` : "Awaiting payment"}
+                                {isPaid ? `Paid on ${new Date(fine.paid_at ?? fine.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}` : "Awaiting payment"}
                               </p>
                             </div>
 

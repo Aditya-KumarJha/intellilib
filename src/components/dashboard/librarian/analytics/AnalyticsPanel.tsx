@@ -38,8 +38,8 @@ export default async function AnalyticsPanel() {
   ];
 
   return (
-    <div className="space-y-6">
-      <PanelCard title="Analytics" subtitle="Loans, turnover, and category insights.">
+    <div className="mx-auto w-full space-y-6">
+      <PanelCard className="w-full mx-auto" title="Analytics" subtitle="Loans, turnover, and category insights.">
         <p className="mb-4 text-sm text-foreground/60">
           Live metrics powered by Supabase. This view is server-rendered for accuracy.
         </p>

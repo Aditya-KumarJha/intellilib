@@ -1,6 +1,5 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  Activity,
   BarChart3,
   Bell,
   BookMarked,
@@ -110,12 +109,6 @@ const librarianItems: DashboardNavItem[] = [
     label: "Requests",
     description: "Approve reservations and extension requests.",
     icon: BookMarked,
-  },
-  {
-    segment: "activity",
-    label: "Live Activity",
-    description: "Realtime desk activity powered by Supabase channels.",
-    icon: Activity,
   },
   {
     segment: "analytics",

@@ -45,6 +45,7 @@ export function statusLabel(status: ReservationItem["status"]) {
 export function formatDateTime(value: string | null) {
   if (!value) return "-";
   return new Date(value).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
     dateStyle: "medium",
     timeStyle: "short",
   });

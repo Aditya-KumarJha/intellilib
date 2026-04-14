@@ -124,7 +124,7 @@ export const smartNotifications = [
 export const quickActions = [
   { label: "Search Book", href: "/dashboard/user/search", icon: Search },
   { label: "View My Books", href: "/dashboard/user/my-books", icon: BookOpen },
-  { label: "Pay Fine", href: "/dashboard/user/payments", icon: CreditCard },
+  { label: "Pay Fine", href: "/dashboard/user/fines", icon: CreditCard },
   { label: "Ask AI", href: "/dashboard/user/assistant", icon: Sparkles },
 ];
 

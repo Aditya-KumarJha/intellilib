@@ -4,6 +4,7 @@ import { getUserFromRequest } from "@/lib/server/apiAuth";
 import { logAuditEvent } from "@/lib/server/auditLogs";
 import { notifyUserById } from "@/lib/server/libraryNotifications";
 import { compactQueuePositions, getPhysicalAvailableCopyIds } from "@/lib/server/reservationService";
+import { ensureActionAllowedForUser } from "@/lib/server/suspensionGuard";
 import supabaseAdmin from "@/lib/supabaseServerClient";
 
 type QueueInsertError = {
@@ -98,6 +99,11 @@ export async function POST(req: Request) {
   const user = await getUserFromRequest(req);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const permission = await ensureActionAllowedForUser(user.id);
+  if (!permission.allowed) {
+    return NextResponse.json({ error: permission.message }, { status: 403 });
   }
 
   const body: ReservationBody = await req.json().catch(() => ({}));
@@ -199,6 +205,11 @@ export async function DELETE(req: Request) {
   const user = await getUserFromRequest(req);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const permission = await ensureActionAllowedForUser(user.id);
+  if (!permission.allowed) {
+    return NextResponse.json({ error: permission.message }, { status: 403 });
   }
 
   const url = new URL(req.url);

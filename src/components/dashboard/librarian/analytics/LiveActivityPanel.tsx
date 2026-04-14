@@ -4,7 +4,11 @@ import { getRecentTransactions } from "@/lib/server/adminAnalytics";
 function shortDate(d?: string | null) {
   if (!d) return "-";
   try {
-    return new Date(d).toLocaleString();
+    return new Date(d).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
   } catch {
     return d;
   }
@@ -14,8 +18,8 @@ export default async function LiveActivityPanel() {
   const tx = await getRecentTransactions(20);
 
   return (
-    <div className="space-y-6">
-      <PanelCard title="Live Activity" subtitle="Realtime desk activity powered by Supabase channels.">
+    <div className="mx-auto w-full space-y-6">
+      <PanelCard className="w-full mx-auto" title="Live Activity" subtitle="Realtime desk activity.">
         <p className="mb-4 text-sm text-foreground/60">
           This area shows the most recent transactions and workflow events.
         </p>
@@ -35,7 +39,7 @@ export default async function LiveActivityPanel() {
                     <tr key={t.id} className="border-t border-black/5 dark:border-white/5">
                       <td className="px-4 py-3">{shortDate(t.created_at)}</td>
                       <td className="px-4 py-3">{t.id}</td>
-                      <td className="px-4 py-3 break-words max-w-xs">
+                      <td className="px-4 py-3 wrap-break-word max-w-xs">
                         <div className="flex items-center gap-2">
                           {t.user_avatar ? (
                             // eslint-disable-next-line @next/next/no-img-element

@@ -6,6 +6,8 @@ import { AlarmClock, Bot, BookOpen, CreditCard } from "lucide-react";
 import DashboardStatCard from "@/components/dashboard/DashboardStatCard";
 import { supabase } from "@/lib/supabaseClient";
 
+import useAuthStore from "@/lib/authStore";
+
 type DashboardStats = {
   activeIssued: number;
   activeReserved: number;
@@ -15,6 +17,7 @@ type DashboardStats = {
 };
 
 export default function UserStatsRow() {
+  const user = useAuthStore((state) => state.user);
   const [stats, setStats] = useState<DashboardStats>({
     activeIssued: 0,
     activeReserved: 0,
@@ -27,8 +30,7 @@ export default function UserStatsRow() {
     let mounted = true;
 
     async function load() {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData.session?.user?.id;
+      const userId = user?.id;
       if (!userId || !mounted) return;
 
       const now = new Date();
@@ -84,7 +86,7 @@ export default function UserStatsRow() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [user?.id]);
 
   const cards = useMemo(
     () => [

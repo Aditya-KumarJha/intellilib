@@ -7,6 +7,7 @@ const HOLD_HOURS = 24;
 
 function formatHoldDeadline(isoDate: string) {
   return new Date(isoDate).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -38,7 +39,7 @@ async function sendDueAndFineAlerts() {
     const book = Array.isArray(copy?.books) ? copy?.books[0] : copy?.books;
     const bookTitle = book?.title ?? "your book";
     const dueText = row.due_date
-      ? new Date(row.due_date).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+      ? new Date(row.due_date).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })
       : "soon";
     const message = `Reminder: ${bookTitle} is due by ${dueText}.`;
 

@@ -1,11 +1,19 @@
 import { notFound } from "next/navigation";
 
 import DashboardSectionPlaceholder from "@/components/dashboard/DashboardSectionPlaceholder";
-import { getSectionMeta, isValidDashboardSection } from "@/lib/dashboardNav";
+import { getSectionMeta, isValidDashboardSection, getDashboardNav } from "@/lib/dashboardNav";
 
 type PageProps = {
   params: Promise<{ section: string }>;
 };
+
+export function generateStaticParams() {
+  return getDashboardNav("admin")
+    .filter((item) => item.segment !== null)
+    .map((item) => ({
+      section: item.segment as string,
+    }));
+}
 
 export default async function AdminDashboardSectionPage({ params }: PageProps) {
   const { section } = await params;

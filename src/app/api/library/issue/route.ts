@@ -11,6 +11,7 @@ import {
   getPhysicalAvailableCopyIds,
   hasApprovedReservationForAnotherUser,
 } from "@/lib/server/reservationService";
+import { ensureActionAllowedForUser } from "@/lib/server/suspensionGuard";
 import supabaseAdmin from "@/lib/supabaseServerClient";
 
 type IssueBody = {
@@ -27,6 +28,11 @@ export async function POST(req: Request) {
   const user = await getUserFromRequest(req);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const permission = await ensureActionAllowedForUser(user.id);
+  if (!permission.allowed) {
+    return NextResponse.json({ error: permission.message }, { status: 403 });
   }
 
   const body: IssueBody = await req.json().catch(() => ({}));
@@ -233,6 +239,7 @@ export async function POST(req: Request) {
   }
 
   const dueText = new Date(dueDate).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -273,7 +280,6 @@ export async function POST(req: Request) {
     }
   } catch (err) {
     // non-fatal: log and continue
-    // eslint-disable-next-line no-console
     console.error("[issue.route] failed to create librarian notifications:", err);
   }
 

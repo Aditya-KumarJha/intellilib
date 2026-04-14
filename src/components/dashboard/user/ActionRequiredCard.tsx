@@ -6,6 +6,8 @@ import { AlertTriangle } from "lucide-react";
 import UserPanelCard from "@/components/dashboard/user/UserPanelCard";
 import { supabase } from "@/lib/supabaseClient";
 
+import useAuthStore from "@/lib/authStore";
+
 type ActionMetrics = {
   dueIn3Days: number;
   overdue: number;
@@ -19,6 +21,7 @@ const toneStyles = {
 };
 
 export default function ActionRequiredCard() {
+  const user = useAuthStore((state) => state.user);
   const [metrics, setMetrics] = useState<ActionMetrics>({
     dueIn3Days: 0,
     overdue: 0,
@@ -29,8 +32,7 @@ export default function ActionRequiredCard() {
     let mounted = true;
 
     async function load() {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
+      const userId = user?.id;
       if (!userId || !mounted) return;
 
       const now = new Date();
@@ -76,7 +78,7 @@ export default function ActionRequiredCard() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [user?.id]);
 
   const actionRequiredItems = useMemo(
     () => [
