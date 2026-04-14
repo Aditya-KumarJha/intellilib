@@ -19,6 +19,8 @@ export function mapMyBookIssueRow(row: MyBookIssueRow): MyBookIssue | null {
     returnDate: row.return_date,
     status: row.status,
     fineAmount: row.fine_amount ?? 0,
+    returnRequestPending: false,
+    returnRequestRequestedAt: null,
     copyType: copy.type,
     copyStatus: copy.status,
     location: copy.location,
@@ -68,7 +70,7 @@ export function formatCurrency(amount: number | string | null | undefined): stri
   const value = Number(amount || 0);
   try {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
-  } catch (e) {
+  } catch {
     return `Rs. ${Math.round(value)}`;
   }
 }

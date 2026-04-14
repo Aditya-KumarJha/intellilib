@@ -27,8 +27,8 @@ export default function UserStatsRow() {
     let mounted = true;
 
     async function load() {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user?.id;
       if (!userId || !mounted) return;
 
       const now = new Date();
@@ -78,7 +78,9 @@ export default function UserStatsRow() {
       });
     }
 
-    void load();
+    void load().catch(() => {
+      // Ignore auth race errors; a subsequent state change will refetch.
+    });
     return () => {
       mounted = false;
     };

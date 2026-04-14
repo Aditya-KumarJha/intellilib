@@ -23,7 +23,7 @@ const statusStyles: Record<"issued" | "returned" | "overdue", string> = {
 export default function MyBookIssueCard({ issue }: MyBookIssueCardProps) {
   const visualStatus = getIssueVisualStatus(issue);
   const [requestingReturn, setRequestingReturn] = useState(false);
-  const [returningNow, setReturningNow] = useState(false);
+  const hasPendingReturnRequest = Boolean(issue.returnRequestPending);
 
   async function authedFetch(url: string, init?: RequestInit) {
     const { data } = await supabase.auth.getSession();
@@ -122,12 +122,17 @@ export default function MyBookIssueCard({ issue }: MyBookIssueCardProps) {
             </a>
           ) : null}
 
-          {/* Actions: Request return or return now (client-side) */}
+          {/* Actions: Return is request-only and processed by librarian */}
           {(visualStatus === "issued" || visualStatus === "overdue") && (
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={async () => {
+                  if (hasPendingReturnRequest) {
+                    toast.info("Return request already in process.");
+                    return;
+                  }
+
                   try {
                     setRequestingReturn(true);
                     const res = await authedFetch(`/api/library/returns`, {
@@ -143,35 +148,17 @@ export default function MyBookIssueCard({ issue }: MyBookIssueCardProps) {
                     setRequestingReturn(false);
                   }
                 }}
-                disabled={requestingReturn || returningNow}
+                disabled={requestingReturn || hasPendingReturnRequest}
                 className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white/75 px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/10 dark:hover:bg-white/15"
               >
-                {requestingReturn ? "Requesting..." : "Request return"}
+                {requestingReturn ? "Requesting..." : hasPendingReturnRequest ? "Return in process" : "Request return"}
               </button>
 
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    setReturningNow(true);
-                    const res = await authedFetch(`/api/library/returns`, {
-                      method: "POST",
-                      body: JSON.stringify({ transactionId: issue.id, mode: "instant" }),
-                    });
-                    const payload = await res.json();
-                    if (!res.ok) throw new Error(payload?.error ?? "Could not return book");
-                    toast.success("Book marked returned.");
-                  } catch (e) {
-                    toast.error(e instanceof Error ? e.message : String(e));
-                  } finally {
-                    setReturningNow(false);
-                  }
-                }}
-                disabled={requestingReturn || returningNow}
-                className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {returningNow ? "Returning..." : "Return now"}
-              </button>
+              {hasPendingReturnRequest ? (
+                <span className="inline-flex items-center rounded-xl bg-purple-600/10 px-3 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300">
+                  Waiting for librarian approval
+                </span>
+              ) : null}
             </div>
           )}
         </div>

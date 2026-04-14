@@ -18,8 +18,8 @@ export default function SmartNotificationsPanel() {
     let mounted = true;
 
     async function load() {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user?.id;
       if (!userId || !mounted) return;
 
       const { data } = await supabase
@@ -41,7 +41,9 @@ export default function SmartNotificationsPanel() {
       setSmartNotifications(mapped);
     }
 
-    void load();
+    void load().catch(() => {
+      // Ignore auth race errors; a subsequent state change will refetch.
+    });
     return () => {
       mounted = false;
     };
@@ -60,9 +62,9 @@ export default function SmartNotificationsPanel() {
             No notifications yet.
           </article>
         ) : null}
-        {smartNotifications.map((item) => (
+        {smartNotifications.map((item, index) => (
           <article
-            key={item.title}
+            key={`${item.title}-${item.description}-${index}`}
             className="rounded-2xl border border-black/10 bg-white/60 p-3 dark:border-white/10 dark:bg-white/5"
           >
             <p className="inline-flex items-center gap-1 text-sm font-medium text-foreground">

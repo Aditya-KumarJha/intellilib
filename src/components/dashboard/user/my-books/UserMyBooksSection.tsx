@@ -10,6 +10,12 @@ import { buildMyBooksStats, mapMyBookIssueRow } from "@/components/dashboard/use
 import type { MyBookIssue, MyBookIssueRow } from "@/components/dashboard/user/my-books/types";
 import { supabase } from "@/lib/supabaseClient";
 
+type ReturnRequestRow = {
+  transaction_id: number;
+  status: "pending" | "approved" | "rejected";
+  requested_at: string | null;
+};
+
 export default function UserMyBooksSection() {
   const [issues, setIssues] = useState<MyBookIssue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,6 +95,23 @@ export default function UserMyBooksSection() {
             const paidAt = paidMap.get(m.id as number) ?? null;
             m.finePaid = Boolean(paidAt);
             m.finePaidAt = paidAt;
+          }
+
+          const { data: returnRequestsData } = await supabase
+            .from("return_requests")
+            .select("transaction_id,status,requested_at")
+            .in("transaction_id", txIds)
+            .eq("user_id", currentUserId)
+            .eq("status", "pending");
+
+          const pendingReturnMap = new Map<number, string | null>();
+          (returnRequestsData ?? []).forEach((row: ReturnRequestRow) => {
+            pendingReturnMap.set(Number(row.transaction_id), row.requested_at ?? null);
+          });
+
+          for (const m of mapped) {
+            m.returnRequestPending = pendingReturnMap.has(m.id);
+            m.returnRequestRequestedAt = pendingReturnMap.get(m.id) ?? null;
           }
         }
       } catch {
@@ -217,6 +240,19 @@ export default function UserMyBooksSection() {
           setPage(0);
           void loadMyBooks(0, false);
           void fetchServerStats();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "return_requests",
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        () => {
+          setPage(0);
+          void loadMyBooks(0, false);
         },
       )
       .subscribe();

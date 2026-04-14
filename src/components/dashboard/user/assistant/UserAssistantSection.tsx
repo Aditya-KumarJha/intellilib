@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, SendHorizontal, Sparkles } from "lucide-react";
 
 import { supabase } from "@/lib/supabaseClient";
-import { dashboardHref } from "@/lib/dashboardNav";
 
 type ChatRole = "user" | "assistant";
 
@@ -19,9 +19,14 @@ const STARTER_PROMPTS = [
   "Issue clean code",
   "Reserve clean architecture",
   "Show my active loans",
+  "Return all my active books",
+  "Suggest similar books to clean code",
+  "Show books by Martin Kleppmann",
+  "What books are available in digital format?",
+  "Which books are due this week?",
 ];
 
-const GENERIC_ASSISTANT_ERROR_MESSAGE = "I could not complete that request right now. Please try again in a moment.";
+const GENERIC_ASSISTANT_ERROR_MESSAGE = "Could not complete now. Please try later.";
 
 async function authedFetch(url: string, init?: RequestInit) {
   const { data } = await supabase.auth.getSession();
@@ -41,7 +46,53 @@ async function authedFetch(url: string, init?: RequestInit) {
   });
 }
 
+function renderAssistantContent(content: string): ReactNode {
+  const lines = content.split("\n");
+  const nodes: ReactNode[] = [];
+  let bullets: string[] = [];
+  let key = 0;
+
+  const flushBullets = () => {
+    if (!bullets.length) return;
+    nodes.push(
+      <ul key={`bullets-${key++}`} className="list-disc space-y-1 pl-5 text-[13px] leading-relaxed">
+        {bullets.map((item, idx) => (
+          <li key={`item-${idx}`}>{item}</li>
+        ))}
+      </ul>,
+    );
+    bullets = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    const bulletMatch = line.match(/^\s*[-*]\s+(.*)$/);
+
+    if (bulletMatch) {
+      bullets.push(bulletMatch[1]);
+      continue;
+    }
+
+    flushBullets();
+
+    if (!line.trim()) {
+      nodes.push(<div key={`spacer-${key++}`} className="h-1" />);
+      continue;
+    }
+
+    nodes.push(
+      <p key={`line-${key++}`} className="text-[13px] leading-relaxed">
+        {line}
+      </p>,
+    );
+  }
+
+  flushBullets();
+  return <div className="space-y-1.5">{nodes}</div>;
+}
+
 export default function UserAssistantSection() {
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "assistant",
@@ -51,7 +102,16 @@ export default function UserAssistantSection() {
   ]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages, sending]);
 
   const canSend = useMemo(() => input.trim().length > 0 && !sending, [input, sending]);
 
@@ -63,7 +123,6 @@ export default function UserAssistantSection() {
     setMessages(nextMessages);
     setInput("");
     setSending(true);
-    setError(null);
 
     try {
       const res = await authedFetch("/api/library/assistant", {
@@ -74,13 +133,13 @@ export default function UserAssistantSection() {
       const payload = (await res.json().catch(() => ({}))) as { reply?: string; error?: string };
 
       if (!res.ok) {
-        throw new Error(GENERIC_ASSISTANT_ERROR_MESSAGE);
+        throw new Error(payload.error ?? "Assistant request failed");
       }
 
       const reply = payload.reply ?? "I could not generate a response right now.";
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
-    } catch {
-      setError(GENERIC_ASSISTANT_ERROR_MESSAGE);
+    } catch (error: unknown) {
+      console.error("Assistant request failed:", error);
       setMessages((prev) => [
         ...prev,
         {
@@ -110,7 +169,7 @@ export default function UserAssistantSection() {
           </div>
           <span className="inline-flex items-center gap-2 rounded-2xl border border-black/10 bg-white/70 px-3 py-2 text-xs font-medium text-foreground/70 dark:border-white/10 dark:bg-white/10">
             <Bot className="h-4 w-4" />
-            Gemini + LangGraph
+            AI Powered
           </span>
         </div>
 
@@ -131,20 +190,20 @@ export default function UserAssistantSection() {
         </div>
 
         <div className="mt-5 rounded-2xl border border-black/10 bg-white/75 p-3 dark:border-white/10 dark:bg-black/20">
-          <div className="max-h-105 space-y-3 overflow-y-auto px-1 py-1">
+          <div ref={messagesContainerRef} className="max-h-105 space-y-3 overflow-y-auto px-1 py-1">
             {messages.map((message, index) => (
               <div
                 key={`${message.role}-${index}`}
                 className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                  className={`max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                     message.role === "user"
                       ? "bg-cyan-600 text-white"
                       : "border border-black/10 bg-white text-foreground dark:border-white/10 dark:bg-white/10"
                   }`}
                 >
-                  {message.content}
+                  {message.role === "assistant" ? renderAssistantContent(message.content) : message.content}
                 </div>
               </div>
             ))}
@@ -157,12 +216,6 @@ export default function UserAssistantSection() {
               </div>
             ) : null}
           </div>
-
-          {error ? (
-            <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-300">
-              {error}
-            </p>
-          ) : null}
 
           <form
             className="mt-3 flex items-center gap-2"

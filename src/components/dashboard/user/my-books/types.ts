@@ -72,6 +72,8 @@ export type MyBookIssue = {
   fineAmount: number;
   finePaid?: boolean;
   finePaidAt?: string | null;
+  returnRequestPending?: boolean;
+  returnRequestRequestedAt?: string | null;
   copyType: "physical" | "digital";
   copyStatus: string;
   location: string | null;

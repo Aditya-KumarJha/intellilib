@@ -9,7 +9,14 @@ type ReservationBody = {
   bookId?: number;
 };
 
-async function createQueuedReservation(userId: string, bookId: number) {
+type QueuedReservationInsert = { id: number; queue_position: number };
+
+type CreateQueuedReservationResult = {
+  inserted: QueuedReservationInsert | null;
+  error: Error | { message?: string; details?: string; code?: string } | null;
+};
+
+async function createQueuedReservation(userId: string, bookId: number): Promise<CreateQueuedReservationResult> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const { data: maxQueue } = await supabaseAdmin
       .from("reservations")

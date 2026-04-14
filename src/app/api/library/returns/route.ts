@@ -21,13 +21,17 @@ export async function POST(req: Request) {
   const txId = Number(body.transactionId);
   const mode = body.mode ?? "request";
 
+  if (mode !== "request") {
+    return NextResponse.json({ error: "Direct returns are disabled. Please request return for librarian approval." }, { status: 400 });
+  }
+
   if (!Number.isFinite(txId) || txId <= 0) {
     return NextResponse.json({ error: "Invalid transactionId" }, { status: 400 });
   }
 
   const { data: txRows, error: txErr } = await supabaseAdmin
     .from("transactions")
-    .select("id,book_copy_id,book_copies!inner(book_id,books(id,title))")
+    .select("id,user_id,return_date,book_copy_id,book_copies!inner(book_id,books(id,title))")
     .eq("id", txId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -36,32 +40,43 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
   }
 
-  const bookTitle = txRows.book_copies?.books?.title ?? "your book";
+  const copy = Array.isArray(txRows.book_copies) ? txRows.book_copies[0] : txRows.book_copies;
+  const book = Array.isArray(copy?.books) ? copy?.books[0] : copy?.books;
+  const bookTitle = book?.title ?? "your book";
 
-  if (mode === "instant") {
-    const now = new Date().toISOString();
-    const { error: updErr } = await supabaseAdmin
-      .from("transactions")
-      .update({ return_date: now })
-      .eq("id", txId)
-      .eq("user_id", user.id)
-      .is("return_date", null);
-
-    if (updErr) return NextResponse.json({ error: updErr.message ?? "Could not return book" }, { status: 500 });
-
-    // notify user
-    await notifyUserById(user.id, {
-      inAppMessage: `${bookTitle} marked returned. Thank you!`,
-      subject: "IntelliLib: Book Return Received",
-      text: `We have recorded your return for ${bookTitle}. Thank you!`,
-      html: `<p>We have recorded your return for <strong>${bookTitle}</strong>. Thank you!</p>`,
-    });
-
-    return NextResponse.json({ ok: true, returned: true });
+  if (txRows.return_date) {
+    return NextResponse.json({ error: "This transaction is already returned." }, { status: 400 });
   }
 
   // mode === 'request' -> create a return request notification for staff
   try {
+    const { data: existingPending } = await supabaseAdmin
+      .from("return_requests")
+      .select("id")
+      .eq("transaction_id", txId)
+      .eq("user_id", user.id)
+      .eq("status", "pending")
+      .maybeSingle();
+
+    if (existingPending?.id) {
+      return NextResponse.json({ ok: true, requested: true, inProcess: true, message: "Return request already in process." });
+    }
+
+    const { error: reqError } = await supabaseAdmin
+      .from("return_requests")
+      .insert({
+        transaction_id: txId,
+        user_id: user.id,
+        status: "pending",
+      });
+
+    if (reqError) {
+      if (reqError.code === "23505") {
+        return NextResponse.json({ ok: true, requested: true, inProcess: true, message: "Return request already in process." });
+      }
+      return NextResponse.json({ error: reqError.message ?? "Could not create return request" }, { status: 500 });
+    }
+
     const message = `${user.email ?? user.id} requested to return ${bookTitle} (tx:${txId}).`;
 
     // Find staff users
@@ -88,7 +103,7 @@ export async function POST(req: Request) {
       html: `<p>Return requested for <strong>${bookTitle}</strong>. A librarian will process it shortly.</p>`,
     });
 
-    return NextResponse.json({ ok: true, requested: true });
+    return NextResponse.json({ ok: true, requested: true, inProcess: true });
   } catch {
     return NextResponse.json({ error: "Could not create return request" }, { status: 500 });
   }
