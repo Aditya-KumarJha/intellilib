@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 
 import { getUserFromRequest } from "@/lib/server/apiAuth";
+import { logAuditEvent } from "@/lib/server/auditLogs";
 import { notifyUserById } from "@/lib/server/libraryNotifications";
 import supabaseAdmin from "@/lib/supabaseServerClient";
 
@@ -97,6 +98,17 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (existingPayment?.status === "success") {
+      await logAuditEvent({
+        userId: user.id,
+        action: "payment_verify_duplicate",
+        entity: "payment",
+        entityId: existingPayment.id,
+        metadata: {
+          provider: "razorpay",
+          orderId: razorpayOrderId,
+          paymentId: razorpayPaymentId,
+        },
+      });
       return NextResponse.json({ ok: true, alreadyProcessed: true });
     }
 
@@ -148,14 +160,35 @@ export async function POST(req: Request) {
       .in("id", fineIds)
       .is("paid_at", null);
 
-    const transactionIds = Array.from(new Set(payableFines.map((row) => row.transaction_id).filter((value) => Number.isFinite(value))));
-    if (transactionIds.length > 0) {
-      await supabaseAdmin
-        .from("transactions")
-        .update({ return_date: now, status: "returned" })
-        .in("id", transactionIds)
-        .eq("user_id", user.id)
-        .is("return_date", null);
+    await logAuditEvent({
+      userId: user.id,
+      action: "payment_verified",
+      entity: "payment",
+      entityId: existingPayment?.id ?? null,
+      metadata: {
+        provider: "razorpay",
+        orderId: razorpayOrderId,
+        paymentId: razorpayPaymentId,
+        fineIds,
+        fineCount: fineIds.length,
+        totalAmount,
+      },
+    });
+
+    for (const fine of payableFines) {
+      await logAuditEvent({
+        userId: user.id,
+        action: "fine_paid",
+        entity: "fine",
+        entityId: fine.id,
+        metadata: {
+          transactionId: fine.transaction_id,
+          amount: fine.amount,
+          provider: "razorpay",
+          orderId: razorpayOrderId,
+          paymentId: razorpayPaymentId,
+        },
+      });
     }
 
     await notifyUserById(user.id, {

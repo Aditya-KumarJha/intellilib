@@ -6,6 +6,11 @@ import { ArrowRight, BookCopy, BookMarked, IndianRupee, type LucideIcon } from "
 import UserPanelCard from "@/components/dashboard/user/UserPanelCard";
 import { supabase } from "@/lib/supabaseClient";
 
+function pickOne<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
 type ActivityItem = {
   actor: string;
   action: string;
@@ -59,9 +64,9 @@ export default function UserRecentActivityFeed() {
       if (!mounted) return;
 
       const txItems: Array<ActivityItem & { sortAt: number }> = (txRes.data ?? []).map((tx) => {
-        const bookTitle = Array.isArray(tx.book_copies)
-          ? tx.book_copies[0]?.books?.title
-          : tx.book_copies?.books?.title;
+        const copy = pickOne(tx.book_copies);
+        const book = pickOne(copy?.books);
+        const bookTitle = book?.title;
         const returned = Boolean(tx.return_date) || tx.status === "returned";
         const stamp = (returned ? tx.return_date : tx.issue_date) ?? tx.issue_date ?? new Date().toISOString();
 
@@ -83,7 +88,8 @@ export default function UserRecentActivityFeed() {
       }));
 
       const reservationItems: Array<ActivityItem & { sortAt: number }> = (reservationRes.data ?? []).map((reservation) => {
-        const title = Array.isArray(reservation.books) ? reservation.books[0]?.title : reservation.books?.title;
+        const book = pickOne(reservation.books);
+        const title = book?.title;
         return {
           actor: "You",
           action: `reserved \"${title ?? "book"}\"`,

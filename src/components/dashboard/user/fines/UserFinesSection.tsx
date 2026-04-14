@@ -154,6 +154,7 @@ export default function UserFinesSection() {
   const [selected, setSelected] = useState<number[]>([]);
   const [paying, setPaying] = useState(false);
   const [activeTab, setActiveTab] = useState<"unpaid" | "paid">("unpaid");
+  const [userId, setUserId] = useState<string | null>(null);
 
   async function loadFines(isActive = true) {
     setLoading(true);
@@ -161,8 +162,8 @@ export default function UserFinesSection() {
 
     try {
       const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
-      if (!userId) {
+      const resolvedUserId = userData?.user?.id;
+      if (!resolvedUserId) {
         if (isActive) {
           setError("Not signed in");
           setFines([]);
@@ -170,12 +171,16 @@ export default function UserFinesSection() {
         return;
       }
 
+      if (isActive) {
+        setUserId(resolvedUserId);
+      }
+
       const { data, error: fetchError } = await supabase
         .from("fines")
         .select(
           "id,amount,transaction_id,paid_at,created_at,status,transactions(id,issue_date,due_date,return_date,status,fine_amount,book_copies(id,location,access_url,books(id,title,author,cover_url,publisher)))",
         )
-        .eq("user_id", userId)
+        .eq("user_id", resolvedUserId)
         .order("created_at", { ascending: false });
 
       if (!isActive) return;
@@ -206,6 +211,42 @@ export default function UserFinesSection() {
       isActive = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`fines-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "fines",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          void loadFines();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "payments",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          void loadFines();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   const unpaid = useMemo(() => fines.filter((fine) => !fine.paid_at), [fines]);
   const paid = useMemo(() => fines.filter((fine) => Boolean(fine.paid_at)), [fines]);

@@ -4,8 +4,20 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { formatDate } from "@/components/dashboard/user/my-books/my-books-utils";
 
+type NotificationRow = {
+  id: number;
+  type: string | null;
+  message: string;
+  is_read: boolean | number | string | null;
+  created_at: string;
+};
+
+type NotificationInsertPayload = {
+  new: NotificationRow;
+};
+
 export default function NotificationsSection() {
-  const [notes, setNotes] = useState<any[]>([]);
+  const [notes, setNotes] = useState<NotificationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "unread">("unread");
   const [counts, setCounts] = useState<{ total: number; unread: number }>({ total: 0, unread: 0 });
@@ -31,10 +43,10 @@ export default function NotificationsSection() {
         .order("created_at", { ascending: false });
 
       if (!mounted) return;
-      const allData = (allRes.data ?? []) as any[];
+      const allData = (allRes.data ?? []) as NotificationRow[];
 
       // helper to interpret is_read values robustly
-      const isReadValue = (v: any) => {
+      const isReadValue = (v: unknown) => {
         if (v === true || v === 1 || v === "1" || v === "t") return true;
         return false;
       };
@@ -52,7 +64,7 @@ export default function NotificationsSection() {
     load();
 
     // realtime — create a unique channel name so multiple mounts won't collide
-    let channel: any;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
     (async () => {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData?.user?.id;
@@ -68,7 +80,7 @@ export default function NotificationsSection() {
             table: "notifications",
             filter: `user_id=eq.${userId}`,
           },
-          (payload: any) => {
+          (payload: NotificationInsertPayload) => {
             // payload.new will have message/is_read/created_at
             setNotes((s) => [payload.new, ...s]);
           },
@@ -91,8 +103,8 @@ export default function NotificationsSection() {
       setNotes((s) =>
         s.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
       );
-    } catch (e) {
-      console.error(e);
+    } catch (error: unknown) {
+      console.error(error);
     }
   }
 

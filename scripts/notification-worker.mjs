@@ -6,6 +6,8 @@ const rabbitUrl = process.env.RABBITMQ_URL;
 const resendApiKey = process.env.RESEND_API_KEY;
 const resendFrom = process.env.RESEND_FROM;
 const queueName = "library_notifications";
+const deadLetterQueueName = "library_notifications_dead_letter";
+const maxRetryCount = 5;
 
 if (!rabbitUrl) {
   console.error("RABBITMQ_URL is missing");
@@ -40,6 +42,7 @@ async function startWorker() {
   const connection = await amqplib.connect(rabbitUrl);
   const channel = await connection.createChannel();
   await channel.assertQueue(queueName, { durable: true });
+  await channel.assertQueue(deadLetterQueueName, { durable: true });
   await channel.prefetch(10);
 
   console.log(`Listening on queue: ${queueName}`);
@@ -52,7 +55,32 @@ async function startWorker() {
       channel.ack(message);
     } catch (error) {
       console.error("Failed processing message:", error);
-      channel.nack(message, false, true);
+      const headers = message.properties?.headers || {};
+      const retryCount = Number(headers["x-retry-count"] || 0);
+
+      if (retryCount < maxRetryCount) {
+        channel.sendToQueue(queueName, message.content, {
+          persistent: true,
+          contentType: "application/json",
+          headers: {
+            ...headers,
+            "x-retry-count": retryCount + 1,
+          },
+        });
+        channel.ack(message);
+        return;
+      }
+
+      channel.sendToQueue(deadLetterQueueName, message.content, {
+        persistent: true,
+        contentType: "application/json",
+        headers: {
+          ...headers,
+          "x-retry-count": retryCount,
+          "x-failed-at": new Date().toISOString(),
+        },
+      });
+      channel.ack(message);
     }
   });
 }

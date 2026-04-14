@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 
 import { getUserFromRequest } from "@/lib/server/apiAuth";
+import { logAuditEvent } from "@/lib/server/auditLogs";
 import { notifyUserById } from "@/lib/server/libraryNotifications";
 import { compactQueuePositions, getPhysicalAvailableCopyIds } from "@/lib/server/reservationService";
 import supabaseAdmin from "@/lib/supabaseServerClient";
+
+type QueueInsertError = {
+  code?: string;
+  message?: string;
+  details?: string;
+};
 
 type ReservationBody = {
   bookId?: number;
@@ -52,7 +59,12 @@ async function createQueuedReservation(userId: string, bookId: number): Promise<
     return { inserted: null, error: insertError };
   }
 
-  return { inserted: null, error: new Error("Could not place reservation in queue. Please try again.") };
+  return {
+    inserted: null,
+    error: {
+      message: "Could not place reservation in queue. Please try again.",
+    } satisfies QueueInsertError,
+  };
 }
 
 export async function GET(req: Request) {
@@ -158,9 +170,7 @@ export async function POST(req: Request) {
   const { inserted, error: insertError } = await createQueuedReservation(user.id, bookId);
 
   if (insertError || !inserted) {
-    const message = insertError instanceof Error
-      ? insertError.message
-      : insertError?.message ?? "Could not create reservation";
+    const message = String(insertError?.message ?? "Could not create reservation");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
@@ -169,6 +179,17 @@ export async function POST(req: Request) {
     subject: "IntelliLib: Reservation Queue Confirmed",
     text: `You are in queue for "${book.title}" at position #${inserted.queue_position}. We will notify you as soon as a copy is available.`,
     html: `<p>You are in queue for <strong>${book.title}</strong> at position <strong>#${inserted.queue_position}</strong>.</p><p>We will notify you as soon as a copy is available.</p>`,
+  });
+
+  await logAuditEvent({
+    userId: user.id,
+    action: "reservation_created",
+    entity: "reservation",
+    entityId: inserted.id,
+    metadata: {
+      bookId,
+      queuePosition: inserted.queue_position,
+    },
   });
 
   return NextResponse.json({ ok: true, reservation: inserted });
@@ -210,6 +231,17 @@ export async function DELETE(req: Request) {
     .eq("id", row.id);
 
   await compactQueuePositions(row.book_id);
+
+  await logAuditEvent({
+    userId: user.id,
+    action: "reservation_cancelled",
+    entity: "reservation",
+    entityId: row.id,
+    metadata: {
+      bookId: row.book_id,
+      previousStatus: row.status,
+    },
+  });
 
   return NextResponse.json({ ok: true });
 }

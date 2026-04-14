@@ -31,6 +31,7 @@ export default function UserReservationsSection() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [tab, setTab] = useState<"active" | "history">("active");
+  const [userId, setUserId] = useState<string | null>(null);
 
   const loadReservations = useCallback(async () => {
     setLoading(true);
@@ -56,6 +57,45 @@ export default function UserReservationsSection() {
   useEffect(() => {
     void loadReservations();
   }, [loadReservations]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function resolveUser() {
+      const { data } = await supabase.auth.getUser();
+      if (!active) return;
+      setUserId(data.user?.id ?? null);
+    }
+
+    void resolveUser();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`reservations-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "reservations",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          void loadReservations();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, loadReservations]);
 
   async function cancelReservation(id: number) {
     setBusyId(id);

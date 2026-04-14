@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getUserFromRequest } from "@/lib/server/apiAuth";
+import { logAuditEvent } from "@/lib/server/auditLogs";
 import { notifyUserById } from "@/lib/server/libraryNotifications";
 import supabaseAdmin from "@/lib/supabaseServerClient";
 
@@ -59,6 +60,13 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (existingPending?.id) {
+      await logAuditEvent({
+        userId: user.id,
+        action: "return_request_duplicate",
+        entity: "return_request",
+        entityId: existingPending.id,
+        metadata: { transactionId: txId },
+      });
       return NextResponse.json({ ok: true, requested: true, inProcess: true, message: "Return request already in process." });
     }
 
@@ -72,6 +80,13 @@ export async function POST(req: Request) {
 
     if (reqError) {
       if (reqError.code === "23505") {
+        await logAuditEvent({
+          userId: user.id,
+          action: "return_request_duplicate",
+          entity: "return_request",
+          entityId: null,
+          metadata: { transactionId: txId },
+        });
         return NextResponse.json({ ok: true, requested: true, inProcess: true, message: "Return request already in process." });
       }
       return NextResponse.json({ error: reqError.message ?? "Could not create return request" }, { status: 500 });
@@ -101,6 +116,17 @@ export async function POST(req: Request) {
       subject: "IntelliLib: Return Requested",
       text: `Return requested for ${bookTitle}. A librarian will process it shortly.`,
       html: `<p>Return requested for <strong>${bookTitle}</strong>. A librarian will process it shortly.</p>`,
+    });
+
+    await logAuditEvent({
+      userId: user.id,
+      action: "return_request_created",
+      entity: "return_request",
+      entityId: null,
+      metadata: {
+        transactionId: txId,
+        bookTitle,
+      },
     });
 
     return NextResponse.json({ ok: true, requested: true, inProcess: true });

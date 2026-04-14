@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getUserFromRequest } from "@/lib/server/apiAuth";
+import { logAuditEvent } from "@/lib/server/auditLogs";
 import { notifyUserById } from "@/lib/server/libraryNotifications";
 import {
   compactQueuePositions,
@@ -241,6 +242,19 @@ export async function POST(req: Request) {
     subject: "IntelliLib: Book Issued Successfully",
     text: `Your book "${bookRow.title}" has been issued. Please bring your ID card and collect it from the counter. Due date: ${dueText}.`,
     html: `<p>Your book <strong>${bookRow.title}</strong> has been issued.</p><p>Please bring your ID card and collect it from the library counter.</p><p><strong>Due date:</strong> ${dueText}</p>`,
+  });
+
+  await logAuditEvent({
+    userId: user.id,
+    action: "book_issued",
+    entity: "transaction",
+    entityId: inserted.id,
+    metadata: {
+      bookId,
+      copyId: inserted.book_copy_id,
+      dueDate,
+      source: "issue_api",
+    },
   });
 
   return NextResponse.json({

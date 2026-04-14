@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import AuthPage from "@/pages/AuthPage";
 import { buildMetadata } from "@/lib/seo";
 
@@ -12,9 +14,11 @@ export const metadata = buildMetadata({
 
 const Page = () => {
   return (
-    <div>
-      <AuthPage initialMode="login" />
-    </div>
+    <Suspense fallback={<div className="min-h-screen bg-(--page-bg)" />}>
+      <div>
+        <AuthPage initialMode="login" />
+      </div>
+    </Suspense>
   );
 };
 

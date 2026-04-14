@@ -6,6 +6,16 @@ import { Brain } from "lucide-react";
 import UserPanelCard from "@/components/dashboard/user/UserPanelCard";
 import { supabase } from "@/lib/supabaseClient";
 
+type BookRef = {
+  title?: string;
+  author?: string;
+};
+
+function pickOne<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
 const FALLBACK_INSIGHTS = [
   "You prefer Backend and System Design books.",
   "Recommended next track: AI and Distributed Systems.",
@@ -34,10 +44,10 @@ export default function PersonalizedInsightsPanel() {
       const rows = data ?? [];
       const books = rows
         .map((row) => {
-          const copy = Array.isArray(row.book_copies) ? row.book_copies[0] : row.book_copies;
-          return copy?.books ?? null;
+          const copy = pickOne(row.book_copies);
+          return pickOne(copy?.books) as BookRef | null;
         })
-        .filter((book): book is { title?: string; author?: string } => Boolean(book));
+        .filter((book): book is BookRef => Boolean(book));
 
       const authorCount = new Map<string, number>();
       for (const book of books) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getUserFromRequest } from "@/lib/server/apiAuth";
+import { logAuditEvent } from "@/lib/server/auditLogs";
 import supabaseAdmin from "@/lib/supabaseServerClient";
 
 type CreateOrderBody = {
@@ -93,6 +94,21 @@ export async function POST(req: Request) {
         status: "created",
         method: "razorpay",
       });
+
+    await logAuditEvent({
+      userId: user.id,
+      action: "payment_order_created",
+      entity: "payment",
+      entityId: null,
+      metadata: {
+        provider: "razorpay",
+        orderId: data.id,
+        fineIds: normalizedFines.map((row) => row.id),
+        fineCount: normalizedFines.length,
+        amount: totalAmount,
+        currency,
+      },
+    });
 
     return NextResponse.json({
       ok: true,

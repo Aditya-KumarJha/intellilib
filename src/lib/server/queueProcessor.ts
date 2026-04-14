@@ -1,4 +1,5 @@
 import { notifyUserById } from "@/lib/server/libraryNotifications";
+import { hasRecentNotification } from "@/lib/server/libraryNotifications";
 import { compactQueuePositions, getApprovedReservationCount, getPhysicalAvailableCopyIds } from "@/lib/server/reservationService";
 import supabaseAdmin from "@/lib/supabaseServerClient";
 
@@ -15,6 +16,70 @@ function addHours(date: Date, hours: number) {
   const value = new Date(date);
   value.setHours(value.getHours() + hours);
   return value;
+}
+
+async function sendDueAndFineAlerts() {
+  const now = new Date();
+  const dueSoonCutoff = addHours(now, 48).toISOString();
+  const dedupeSince = addHours(now, -24).toISOString();
+  let dueReminderCount = 0;
+  let fineAlertCount = 0;
+
+  const { data: dueSoonRows } = await supabaseAdmin
+    .from("transactions")
+    .select("id,user_id,due_date,status,fine_amount,book_copies!inner(books(title))")
+    .is("return_date", null)
+    .gte("due_date", now.toISOString())
+    .lte("due_date", dueSoonCutoff)
+    .limit(500);
+
+  for (const row of dueSoonRows ?? []) {
+    const copy = Array.isArray(row.book_copies) ? row.book_copies[0] : row.book_copies;
+    const book = Array.isArray(copy?.books) ? copy?.books[0] : copy?.books;
+    const bookTitle = book?.title ?? "your book";
+    const dueText = row.due_date
+      ? new Date(row.due_date).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+      : "soon";
+    const message = `Reminder: ${bookTitle} is due by ${dueText}.`;
+
+    const alreadySent = await hasRecentNotification(row.user_id, "due_reminder", message, dedupeSince);
+    if (alreadySent) continue;
+
+    await notifyUserById(row.user_id, {
+      inAppMessage: message,
+      subject: "IntelliLib: Due Date Reminder",
+      text: message,
+      html: `<p>${message}</p>`,
+      type: "due_reminder",
+    });
+
+    dueReminderCount += 1;
+  }
+
+  const { data: fineRows } = await supabaseAdmin
+    .from("fines")
+    .select("id,user_id,amount,transaction_id")
+    .is("paid_at", null)
+    .gt("amount", 0)
+    .limit(500);
+
+  for (const fine of fineRows ?? []) {
+    const message = `Fine alert: INR ${Math.round(Number(fine.amount ?? 0))} pending. Please pay to avoid account restrictions.`;
+    const alreadySent = await hasRecentNotification(fine.user_id, "fine_alert", message, dedupeSince);
+    if (alreadySent) continue;
+
+    await notifyUserById(fine.user_id, {
+      inAppMessage: message,
+      subject: "IntelliLib: Fine Payment Reminder",
+      text: message,
+      html: `<p>${message}</p>`,
+      type: "fine_alert",
+    });
+
+    fineAlertCount += 1;
+  }
+
+  return { dueReminders: dueReminderCount, fineAlerts: fineAlertCount };
 }
 
 async function expireStaleApprovals() {
@@ -107,5 +172,6 @@ async function approveQueuesForAvailableBooks() {
 export async function runQueueProcessor() {
   const expired = await expireStaleApprovals();
   const approved = await approveQueuesForAvailableBooks();
-  return { ok: true, ...expired, ...approved };
+  const alerts = await sendDueAndFineAlerts();
+  return { ok: true, ...expired, ...approved, ...alerts };
 }

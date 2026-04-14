@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "worker:notifications": "node scripts/notification-worker.mjs",
+    "worker:replay-dead-letter": "node scripts/replay-dead-letter.mjs",
     "worker:up": "docker compose -f docker-compose.worker.yml up -d --build",
     "worker:logs": "docker compose -f docker-compose.worker.yml logs -f notification-worker",
     "worker:down": "docker compose -f docker-compose.worker.yml down"
@@ -55,6 +58,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.4"
   }
 }

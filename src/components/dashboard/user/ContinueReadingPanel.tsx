@@ -6,6 +6,47 @@ import { ArrowRight } from "lucide-react";
 import UserPanelCard from "@/components/dashboard/user/UserPanelCard";
 import { supabase } from "@/lib/supabaseClient";
 
+type RecentIssueRow = {
+  id: number;
+  issue_date: string | null;
+  due_date: string | null;
+  book_copies:
+    | {
+        books:
+          | {
+              id: number;
+              title: string;
+              author: string;
+            }
+          | Array<{
+              id: number;
+              title: string;
+              author: string;
+            }>
+          | null;
+      }
+    | Array<{
+        books:
+          | {
+              id: number;
+              title: string;
+              author: string;
+            }
+          | Array<{
+              id: number;
+              title: string;
+              author: string;
+            }>
+          | null;
+      }>
+    | null;
+};
+
+function pickOne<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
 type ContinueReadingState = {
   lastOpened: {
     title: string;
@@ -59,10 +100,9 @@ export default function ContinueReadingPanel() {
 
       if (!mounted) return;
 
-      const current = recentIssueRes.data;
-      const currentBook = Array.isArray(current?.book_copies)
-        ? current?.book_copies?.[0]?.books
-        : current?.book_copies?.books;
+      const current = (recentIssueRes.data ?? null) as RecentIssueRow | null;
+      const currentCopy = pickOne(current?.book_copies);
+      const currentBook = pickOne(currentCopy?.books);
 
       const dueText = current?.due_date
         ? new Date(current.due_date).toLocaleDateString("en-IN", { dateStyle: "medium" })
