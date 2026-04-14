@@ -149,12 +149,12 @@ export default function NotificationsSection() {
                   {!n.is_read ? (
                     <button
                       onClick={() => markRead(n.id)}
-                      className="rounded-lg bg-purple-600 px-2 py-1 text-white text-xs"
+                      className="rounded-lg bg-purple-600 px-2 py-1 text-white text-xs whitespace-nowrap"
                     >
                       Mark read
                     </button>
                   ) : (
-                    <span className="text-xs text-foreground/60">Read</span>
+                    <span className="text-xs text-foreground/60 whitespace-nowrap">Read</span>
                   )}
                 </div>
               </div>

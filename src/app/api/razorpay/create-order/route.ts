@@ -1,35 +1,72 @@
 import { NextResponse } from "next/server";
+
+import { getUserFromRequest } from "@/lib/server/apiAuth";
 import supabaseAdmin from "@/lib/supabaseServerClient";
 
 type CreateOrderBody = {
-  amount: number; // rupees
-  currency?: string;
   fineIds?: number[];
+  currency?: string;
+};
+
+type FineRow = {
+  id: number;
+  amount: number;
 };
 
 export async function POST(req: Request) {
-  const body: CreateOrderBody = await req.json().catch(() => ({} as any));
-  const amount = Math.max(0, Number(body.amount) || 0);
+  const user = await getUserFromRequest(req);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body: CreateOrderBody = await req.json().catch(() => ({}));
+  const fineIds = Array.isArray(body.fineIds)
+    ? Array.from(new Set(body.fineIds.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)))
+    : [];
   const currency = body.currency || "INR";
-  const fineIds = Array.isArray(body.fineIds) ? body.fineIds : [];
+
+  if (fineIds.length === 0) {
+    return NextResponse.json({ error: "Select at least one unpaid fine." }, { status: 400 });
+  }
 
   const keyId = process.env.RZP_KEY_ID;
   const keySecret = process.env.RZP_KEY_SECRET;
-
   if (!keyId || !keySecret) {
     return NextResponse.json({ error: "Razorpay credentials not configured" }, { status: 500 });
   }
 
-  // create a razorpay order
-  try {
-    const orderPayload = {
-      amount: Math.round(amount * 100),
-      currency,
-      receipt: `fines_${Date.now()}`,
-      payment_capture: 1,
-      notes: { fine_ids: fineIds.join(",") },
-    };
+  const { data: fineRows, error: fineError } = await supabaseAdmin
+    .from("fines")
+    .select("id,amount")
+    .eq("user_id", user.id)
+    .is("paid_at", null)
+    .in("id", fineIds);
 
+  if (fineError) {
+    return NextResponse.json({ error: "Could not validate fines." }, { status: 500 });
+  }
+
+  const normalizedFines = (fineRows ?? []) as FineRow[];
+  if (normalizedFines.length !== fineIds.length) {
+    return NextResponse.json({ error: "Some selected fines are no longer payable." }, { status: 409 });
+  }
+
+  const totalAmount = normalizedFines.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+  if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+    return NextResponse.json({ error: "Selected fines do not have a valid payable amount." }, { status: 409 });
+  }
+
+  const orderPayload = {
+    amount: Math.round(totalAmount * 100),
+    currency,
+    receipt: `fines_${user.id}_${Date.now()}`,
+    notes: {
+      user_id: user.id,
+      fine_ids: normalizedFines.map((row) => row.id).join(","),
+    },
+  };
+
+  try {
     const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
     const res = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
@@ -40,30 +77,36 @@ export async function POST(req: Request) {
       body: JSON.stringify(orderPayload),
     });
 
-    const data = await res.json();
-    if (!res.ok) {
-      return NextResponse.json({ error: data, ok: false }, { status: 500 });
+    const data = (await res.json().catch(() => ({}))) as { id?: string; amount?: number; currency?: string; error?: unknown };
+    if (!res.ok || !data.id) {
+      return NextResponse.json({ error: "Could not create Razorpay order.", detail: data.error ?? data }, { status: 500 });
     }
 
-    // create a server-side placeholder record for tracking attempt (optional)
-    // store a pending payment record so we can later update it atomically on verify
-    try {
-      await supabaseAdmin.from("payments").insert([
-        {
-          user_id: null,
-          fine_id: null,
-          amount: amount,
-          razorpay_order_id: data.id,
-          method: "razorpay",
-        },
-      ]);
-    } catch (e) {
-      // ignore if payments table not yet exists or other issues; verification will still record
-    }
+    await supabaseAdmin
+      .from("payments")
+      .insert({
+        user_id: user.id,
+        fine_id: normalizedFines[0]?.id ?? null,
+        amount: totalAmount,
+        provider: "razorpay",
+        razorpay_order_id: data.id,
+        status: "created",
+        method: "razorpay",
+      });
 
-    return NextResponse.json({ ok: true, order: data, key_id: keyId });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({
+      ok: true,
+      key: keyId,
+      order: {
+        id: data.id,
+        amount: data.amount ?? orderPayload.amount,
+        currency: data.currency ?? currency,
+      },
+      payableAmount: totalAmount,
+      fineCount: normalizedFines.length,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,4 +1,3 @@
-import UserDashboardPage from "@/pages/UserDashboardPage";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
@@ -9,6 +8,7 @@ export const metadata = buildMetadata({
   noIndex: true,
 });
 
-export default function UserDashboardRoutePage() {
+export default async function UserDashboardRoutePage() {
+  const UserDashboardPage = (await import("@/pages/UserDashboardPage")).default;
   return <UserDashboardPage />;
 }

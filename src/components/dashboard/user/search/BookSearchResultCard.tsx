@@ -1,11 +1,15 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { BookOpen, Hash, Layers, Library, Link as LinkIcon } from "lucide-react";
+import { toast } from "react-toastify";
 
 import type { SmartSearchBook } from "@/components/dashboard/user/search/types";
+import { supabase } from "@/lib/supabaseClient";
 
 type BookSearchResultCardProps = {
   book: SmartSearchBook;
+  onActionComplete?: () => void;
 };
 
 function formatTypeLabel(type: SmartSearchBook["type"]) {
@@ -14,7 +18,90 @@ function formatTypeLabel(type: SmartSearchBook["type"]) {
   return "Physical";
 }
 
-export default function BookSearchResultCard({ book }: BookSearchResultCardProps) {
+export default function BookSearchResultCard({ book, onActionComplete }: BookSearchResultCardProps) {
+  const [issuing, setIssuing] = useState(false);
+  const [reserving, setReserving] = useState(false);
+
+  const physicalAvailable = useMemo(
+    () => book.copies.filter((copy) => copy.type === "physical" && copy.status === "available").length,
+    [book.copies],
+  );
+
+  const hasDigitalAccess = Boolean(book.pdf_url || book.copies.some((copy) => copy.type === "digital" && copy.access_url));
+  const isDigitalOnly = book.type === "digital";
+  const isPhysicalOnly = book.type === "physical";
+  const isHybrid = book.type === "both";
+  const digitalUrl = book.pdf_url ?? undefined;
+  const showDigitalButton = (isDigitalOnly || isHybrid) && hasDigitalAccess && Boolean(digitalUrl);
+  const showPhysicalActions = isPhysicalOnly || isHybrid;
+
+  async function authedFetch(url: string, init?: RequestInit) {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) {
+      throw new Error("Session expired. Please log in again.");
+    }
+
+    return fetch(url, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(init?.headers ?? {}),
+      },
+    });
+  }
+
+  async function handleIssue() {
+    setIssuing(true);
+    try {
+      const res = await authedFetch("/api/library/issue", {
+        method: "POST",
+        body: JSON.stringify({ bookId: book.id }),
+      });
+      const payload = await res.json();
+
+      if (!res.ok) {
+        throw new Error(payload?.error ?? "Could not issue book");
+      }
+
+      if (payload?.mode === "digital_access") {
+        toast.info(payload?.message ?? "Digital book is available instantly.");
+      } else {
+        toast.success(payload?.message ?? "Book issue successful.");
+      }
+      onActionComplete?.();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message);
+    } finally {
+      setIssuing(false);
+    }
+  }
+
+  async function handleReserve() {
+    setReserving(true);
+    try {
+      const res = await authedFetch("/api/library/reservations", {
+        method: "POST",
+        body: JSON.stringify({ bookId: book.id }),
+      });
+      const payload = await res.json();
+
+      if (!res.ok) {
+        throw new Error(payload?.error ?? "Could not create reservation");
+      }
+
+      toast.success(`Added to queue at position #${payload?.reservation?.queue_position ?? "-"}.`);
+      onActionComplete?.();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message);
+    } finally {
+      setReserving(false);
+    }
+  }
+
   return (
     <article className="overflow-hidden rounded-3xl border border-black/10 bg-white/70 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-white/5">
       <div className="flex flex-col gap-4 p-4 sm:flex-row sm:p-5">
@@ -72,17 +159,43 @@ export default function BookSearchResultCard({ book }: BookSearchResultCardProps
             ) : null}
           </div>
 
-          {book.pdf_url ? (
-            <a
-              href={book.pdf_url}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white/70 px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-black/5 dark:border-white/10 dark:bg-white/10 dark:hover:bg-white/15"
-            >
-              <LinkIcon className="h-3.5 w-3.5" aria-hidden />
-              Preview digital copy
-            </a>
-          ) : null}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {showDigitalButton ? (
+              <a
+                href={digitalUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white/70 px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-black/5 dark:border-white/10 dark:bg-white/10 dark:hover:bg-white/15"
+              >
+                <LinkIcon className="h-3.5 w-3.5" aria-hidden />
+                Open digital copy
+              </a>
+            ) : null}
+
+            {showPhysicalActions && physicalAvailable > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void handleIssue();
+                }}
+                disabled={issuing}
+                className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {issuing ? "Issuing..." : "Issue now"}
+              </button>
+            ) : showPhysicalActions ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void handleReserve();
+                }}
+                disabled={reserving}
+                className="inline-flex items-center gap-2 rounded-xl border border-amber-400/35 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-300"
+              >
+                {reserving ? "Adding..." : "Join reservation queue"}
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </article>

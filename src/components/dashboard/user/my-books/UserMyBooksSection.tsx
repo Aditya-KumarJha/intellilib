@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, BookOpen, RefreshCcw } from "lucide-react";
+import { BookOpen, RefreshCcw } from "lucide-react";
 
 import InfiniteScroll from "react-infinite-scroll-component";
 import MyBookIssueCard from "@/components/dashboard/user/my-books/MyBookIssueCard";
@@ -10,7 +9,6 @@ import MyBooksStatsRow from "@/components/dashboard/user/my-books/MyBooksStatsRo
 import { buildMyBooksStats, mapMyBookIssueRow } from "@/components/dashboard/user/my-books/my-books-utils";
 import type { MyBookIssue, MyBookIssueRow } from "@/components/dashboard/user/my-books/types";
 import { supabase } from "@/lib/supabaseClient";
-import { dashboardHref } from "@/lib/dashboardNav";
 
 export default function UserMyBooksSection() {
   const [issues, setIssues] = useState<MyBookIssue[]>([]);
@@ -21,6 +19,9 @@ export default function UserMyBooksSection() {
   const [activeFilter, setActiveFilter] = useState<"all" | "issued" | "overdue" | "returned" | "fine">("all");
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [serverStats, setServerStats] = useState<
+    { activeCount: number; overdueCount: number; returnedCount: number; dueFineAmount: number } | null
+  >(null);
   const PAGE_SIZE = 12;
 
   const loadMyBooks = useCallback(
@@ -74,7 +75,7 @@ export default function UserMyBooksSection() {
             .eq("user_id", currentUserId);
 
           const paidMap = new Map<number, string | null>();
-          (finesData ?? []).forEach((f: any) => {
+          (finesData ?? []).forEach((f: { transaction_id: number; paid_at: string | null }) => {
             // prefer the latest paid_at if multiple
             const tx = Number(f.transaction_id);
             const prev = paidMap.get(tx);
@@ -86,11 +87,11 @@ export default function UserMyBooksSection() {
           // attach fine paid info
           for (const m of mapped) {
             const paidAt = paidMap.get(m.id as number) ?? null;
-            (m as any).finePaid = !!paidAt;
-            (m as any).finePaidAt = paidAt;
+            m.finePaid = Boolean(paidAt);
+            m.finePaidAt = paidAt;
           }
         }
-      } catch (e) {
+      } catch {
         // ignore fines fetch errors — non-critical
       }
 
@@ -125,42 +126,7 @@ export default function UserMyBooksSection() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!currentUserId) return;
-
-    // reset paging when user or filter changes
-    setPage(0);
-    void loadMyBooks(0, false);
-
-    const channel = supabase
-      .channel(`my-books-${currentUserId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "transactions",
-          filter: `user_id=eq.${currentUserId}`,
-        },
-        () => {
-          // reload first page on realtime events and refresh server stats
-          setPage(0);
-          void loadMyBooks(0, false);
-          void fetchServerStats();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [currentUserId, loadMyBooks, activeFilter]);
-
   const stats = useMemo(() => buildMyBooksStats(issues), [issues]);
-  const [serverStats, setServerStats] = useState<
-    | { activeCount: number; overdueCount: number; returnedCount: number; dueFineAmount: number }
-    | null
-  >(null);
 
   const fetchServerStats = useCallback(async () => {
     if (!currentUserId) return;
@@ -189,12 +155,14 @@ export default function UserMyBooksSection() {
         const activeCount = Array.isArray(issuedRows.data) ? issuedRows.data.length : 0;
         const overdueCount = Array.isArray(overdueRows.data) ? overdueRows.data.length : 0;
         const returnedCount = Array.isArray(returnedRows.data) ? returnedRows.data.length : 0;
-        const unpaidFines = Array.isArray(finesRows.data) ? finesRows.data.reduce((s: number, r: any) => s + Number(r.amount || 0), 0) : 0;
+        const unpaidFines = Array.isArray(finesRows.data)
+          ? finesRows.data.reduce((sum: number, row: { amount: number | null }) => sum + Number(row.amount || 0), 0)
+          : 0;
         let txFines = 0;
         if (Array.isArray(txFinesRows.data) && txFinesRows.data.length > 0) {
-          const row = txFinesRows.data[0] as any;
+          const row = txFinesRows.data[0] as Record<string, unknown>;
           const key = Object.keys(row)[0];
-          const raw = row[key];
+          const raw = key ? row[key] : null;
           txFines = raw == null ? 0 : Number(raw);
         }
 
@@ -210,23 +178,54 @@ export default function UserMyBooksSection() {
       // combine unpaid fines table + any calculated fines on active overdue transactions
       let dueFineAmount = 0;
       if (Array.isArray(finesSumRes.data) && finesSumRes.data.length > 0) {
-        const row = finesSumRes.data[0] as any;
+        const row = finesSumRes.data[0] as Record<string, unknown>;
         const key = Object.keys(row)[0];
-        const raw = row[key];
+        const raw = key ? row[key] : null;
         dueFineAmount += raw == null ? 0 : Number(raw);
       }
       if (Array.isArray(txFinesRes.data) && txFinesRes.data.length > 0) {
-        const row = txFinesRes.data[0] as any;
+        const row = txFinesRes.data[0] as Record<string, unknown>;
         const key = Object.keys(row)[0];
-        const raw = row[key];
+        const raw = key ? row[key] : null;
         dueFineAmount += raw == null ? 0 : Number(raw);
       }
 
       setServerStats({ activeCount, overdueCount, returnedCount, dueFineAmount });
-    } catch (e) {
+    } catch {
       setServerStats(null);
     }
   }, [currentUserId]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const initialLoadTimer = window.setTimeout(() => {
+      void loadMyBooks(0, false);
+    }, 0);
+
+    const channel = supabase
+      .channel(`my-books-${currentUserId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "transactions",
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        () => {
+          setPage(0);
+          void loadMyBooks(0, false);
+          void fetchServerStats();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      window.clearTimeout(initialLoadTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [currentUserId, loadMyBooks, fetchServerStats]);
 
   const [showTop, setShowTop] = useState(false);
 
@@ -237,7 +236,10 @@ export default function UserMyBooksSection() {
   }
 
   useEffect(() => {
-    void fetchServerStats();
+    const timer = window.setTimeout(() => {
+      void fetchServerStats();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [currentUserId, fetchServerStats]);
 
   useEffect(() => {
@@ -280,7 +282,7 @@ export default function UserMyBooksSection() {
         </div>
       </div>
 
-      <MyBooksStatsRow stats={(serverStats as any) ?? stats} onSelect={onSelectFilter} active={activeFilter} />
+      <MyBooksStatsRow stats={serverStats ?? stats} onSelect={onSelectFilter} active={activeFilter} />
 
       {loading ? (
         <div className="grid gap-4 lg:grid-cols-2">

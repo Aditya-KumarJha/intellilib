@@ -36,4 +36,5 @@ export type BookRow = {
   published_year: number | null;
   categories: { name: string | null }[] | { name: string | null } | null;
   book_copies: BookCopy[] | null;
+  reservations: { status: "waiting" | "approved" | "cancelled" | "completed" }[] | null;
 };

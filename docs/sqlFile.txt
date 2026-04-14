@@ -446,6 +446,36 @@ COMMIT;
 
 BEGIN;
 
+-- Auto-mark transaction returned when a fine gets paid.
+CREATE OR REPLACE FUNCTION public.mark_transaction_returned_on_fine_payment()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.paid_at IS NOT NULL AND (OLD.paid_at IS DISTINCT FROM NEW.paid_at) THEN
+    UPDATE public.transactions
+    SET
+      return_date = COALESCE(return_date, NEW.paid_at),
+      status = 'returned'
+    WHERE id = NEW.transaction_id
+      AND return_date IS NULL;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_mark_transaction_returned_on_fine_payment ON public.fines;
+CREATE TRIGGER trg_mark_transaction_returned_on_fine_payment
+AFTER UPDATE OF paid_at ON public.fines
+FOR EACH ROW
+WHEN (NEW.paid_at IS NOT NULL)
+EXECUTE FUNCTION public.mark_transaction_returned_on_fine_payment();
+
+COMMIT;
+
+BEGIN;
+
 -- =========================================================
 -- A) Trigger syntax modernization for auth user creation
 -- =========================================================
@@ -673,6 +703,33 @@ WHERE queue_position IS NOT NULL
 CREATE UNIQUE INDEX IF NOT EXISTS unique_active_reservation_per_user_book
 ON public.reservations(user_id, book_id)
 WHERE status IN ('waiting', 'approved');
+
+-- 6) Prevent creating a reservation when the user already holds an active issued copy
+CREATE OR REPLACE FUNCTION public.validate_reservation_no_active_issue()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.transactions t
+    JOIN public.book_copies bc ON bc.id = t.book_copy_id
+    WHERE t.user_id = NEW.user_id
+      AND t.return_date IS NULL
+      AND bc.book_id = NEW.book_id
+  ) THEN
+    RAISE EXCEPTION 'User % already has an active copy of book %; cannot reserve.', NEW.user_id, NEW.book_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_validate_reservation_no_active_issue ON public.reservations;
+CREATE TRIGGER trg_validate_reservation_no_active_issue
+BEFORE INSERT ON public.reservations
+FOR EACH ROW
+WHEN (NEW.status IN ('waiting','approved'))
+EXECUTE FUNCTION public.validate_reservation_no_active_issue();
 
 -- =========================================================
 -- D) Performance indexes for dashboard/use-cases

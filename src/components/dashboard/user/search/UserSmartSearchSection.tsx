@@ -87,7 +87,7 @@ export default function UserSmartSearchSection() {
         let builder = supabase
           .from("books")
           .select(
-            "id,title,author,description,type,isbn,cover_url,pdf_url,publisher,published_year,categories(name),book_copies(id,type,status,location,access_url)"
+            "id,title,author,description,type,isbn,cover_url,pdf_url,publisher,published_year,categories(name),book_copies(id,type,status,location,access_url),reservations(status)"
           )
           .order("title", { ascending: true })
           .range(from, to);
@@ -159,7 +159,7 @@ export default function UserSmartSearchSection() {
           return;
         }
 
-        const ids = (idRows ?? []).map((r: any) => r.id);
+        const ids = (idRows ?? []).map((row: { id: number }) => row.id);
         setTotalBooksCount(ids.length);
 
         if (ids.length === 0) {
@@ -179,7 +179,7 @@ export default function UserSmartSearchSection() {
         }
 
         setTotalCopiesAvailable(copiesCount ?? 0);
-      } catch (e) {
+      } catch {
         setTotalBooksCount(null);
         setTotalCopiesAvailable(null);
       }
@@ -220,6 +220,12 @@ export default function UserSmartSearchSection() {
     [filtered]
   );
 
+  const refreshAfterAction = useCallback(() => {
+    pageRef.current = 0;
+    void loadBooks(0, false);
+    void fetchTotals();
+  }, [loadBooks, fetchTotals]);
+
   return (
     <div className="mx-auto space-y-6">
       <section className="max-w-6xl rounded-3xl border border-black/10 bg-white/75 p-5 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-white/5 sm:p-6">
@@ -231,7 +237,7 @@ export default function UserSmartSearchSection() {
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">Find books by title, author, category</h2>
             <p className="mt-1 text-sm text-foreground/65">
-              Powered by real Supabase records with availability and format filters.
+              Powered by real records with availability and format filters.
             </p>
           </div>
 
@@ -354,7 +360,7 @@ export default function UserSmartSearchSection() {
         >
           <div className="grid gap-4 lg:grid-cols-2">
             {filtered.map((book) => (
-              <BookSearchResultCard key={book.id} book={book} />
+              <BookSearchResultCard key={book.id} book={book} onActionComplete={refreshAfterAction} />
             ))}
           </div>
         </InfiniteScroll>

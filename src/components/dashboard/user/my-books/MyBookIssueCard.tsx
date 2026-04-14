@@ -1,7 +1,11 @@
+import Image from "next/image";
 import { AlertTriangle, BookOpen, CalendarClock, Library, Link as LinkIcon } from "lucide-react";
 
 import { formatDate, getDaysLabel, getIssueVisualStatus, formatCurrency } from "@/components/dashboard/user/my-books/my-books-utils";
 import type { MyBookIssue } from "@/components/dashboard/user/my-books/types";
+import { useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { toast } from "react-toastify";
 
 type MyBookIssueCardProps = {
   issue: MyBookIssue;
@@ -18,18 +22,41 @@ const statusStyles: Record<"issued" | "returned" | "overdue", string> = {
 
 export default function MyBookIssueCard({ issue }: MyBookIssueCardProps) {
   const visualStatus = getIssueVisualStatus(issue);
+  const [requestingReturn, setRequestingReturn] = useState(false);
+  const [returningNow, setReturningNow] = useState(false);
+
+  async function authedFetch(url: string, init?: RequestInit) {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) throw new Error("Session expired");
+
+    const res = await fetch(url, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+
+    return res;
+  }
 
   return (
     <article className="overflow-hidden rounded-3xl border border-black/10 bg-white/70 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-white/5">
       <div className="flex flex-col gap-4 p-4 sm:flex-row sm:p-5">
         <div className="h-40 w-full shrink-0 overflow-hidden rounded-2xl bg-black/5 sm:h-44 sm:w-32 dark:bg-white/10">
           {issue.book.coverUrl ? (
-            <img
-              src={issue.book.coverUrl}
-              alt={`${issue.book.title} cover`}
-              className="h-full w-full object-cover"
-              referrerPolicy="no-referrer"
-            />
+            <div className="relative h-full w-full">
+              <Image
+                src={issue.book.coverUrl}
+                alt={`${issue.book.title} cover`}
+                fill
+                sizes="(max-width: 640px) 100vw, 128px"
+                className="object-cover"
+                unoptimized
+              />
+            </div>
           ) : (
             <div className="flex h-full w-full items-center justify-center text-foreground/45">
               <BookOpen className="h-8 w-8" aria-hidden />
@@ -94,6 +121,59 @@ export default function MyBookIssueCard({ issue }: MyBookIssueCardProps) {
               Open digital copy
             </a>
           ) : null}
+
+          {/* Actions: Request return or return now (client-side) */}
+          {(visualStatus === "issued" || visualStatus === "overdue") && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    setRequestingReturn(true);
+                    const res = await authedFetch(`/api/library/returns`, {
+                      method: "POST",
+                      body: JSON.stringify({ transactionId: issue.id, mode: "request" }),
+                    });
+                    const payload = await res.json();
+                    if (!res.ok) throw new Error(payload?.error ?? "Could not request return");
+                    toast.success("Return requested. A librarian will process it shortly.");
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : String(e));
+                  } finally {
+                    setRequestingReturn(false);
+                  }
+                }}
+                disabled={requestingReturn || returningNow}
+                className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white/75 px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/10 dark:hover:bg-white/15"
+              >
+                {requestingReturn ? "Requesting..." : "Request return"}
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    setReturningNow(true);
+                    const res = await authedFetch(`/api/library/returns`, {
+                      method: "POST",
+                      body: JSON.stringify({ transactionId: issue.id, mode: "instant" }),
+                    });
+                    const payload = await res.json();
+                    if (!res.ok) throw new Error(payload?.error ?? "Could not return book");
+                    toast.success("Book marked returned.");
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : String(e));
+                  } finally {
+                    setReturningNow(false);
+                  }
+                }}
+                disabled={requestingReturn || returningNow}
+                className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {returningNow ? "Returning..." : "Return now"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </article>

@@ -1,0 +1,8 @@
+services:
+  notification-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    restart: always
+    env_file:
+      - .env

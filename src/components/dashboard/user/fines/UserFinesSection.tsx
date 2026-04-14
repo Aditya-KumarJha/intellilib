@@ -1,22 +1,110 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import { formatCurrency } from "@/components/dashboard/user/my-books/my-books-utils";
+import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "react-toastify";
 
-function pickOne<T>(v: T | T[] | null | undefined): T | null {
-  if (!v) return null;
-  return Array.isArray(v) ? (v[0] as T) : (v as T);
+import { formatCurrency } from "@/components/dashboard/user/my-books/my-books-utils";
+import { supabase } from "@/lib/supabaseClient";
+
+type FineTransaction = {
+  id: number;
+  issue_date: string | null;
+  due_date: string | null;
+  return_date: string | null;
+  status: "issued" | "returned" | "overdue" | null;
+  fine_amount: number | null;
+  book_copies:
+    | {
+        id: number;
+        location: string | null;
+        access_url: string | null;
+        books:
+          | {
+              id: number;
+              title: string;
+              author: string;
+              cover_url: string | null;
+              publisher: string | null;
+            }
+          | Array<{
+              id: number;
+              title: string;
+              author: string;
+              cover_url: string | null;
+              publisher: string | null;
+            }>
+          | null;
+      }
+    | Array<{
+        id: number;
+        location: string | null;
+        access_url: string | null;
+        books:
+          | {
+              id: number;
+              title: string;
+              author: string;
+              cover_url: string | null;
+              publisher: string | null;
+            }
+          | Array<{
+              id: number;
+              title: string;
+              author: string;
+              cover_url: string | null;
+              publisher: string | null;
+            }>
+          | null;
+      }>
+    | null;
+};
+
+type FineRow = {
+  id: number;
+  amount: number;
+  transaction_id: number;
+  paid_at: string | null;
+  created_at: string;
+  status?: "pending" | "paid" | null;
+  transactions: FineTransaction | FineTransaction[] | null;
+};
+
+type RazorpaySuccessResponse = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+type RazorpayCheckoutOptions = {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description?: string;
+  order_id: string;
+  handler: (response: RazorpaySuccessResponse) => void | Promise<void>;
+  theme?: { color: string };
+};
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayCheckoutOptions) => { open: () => void };
+  }
 }
 
-function daysLabelFromTx(tx: any): string {
+function pickOne<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function daysLabelFromTx(tx: FineTransaction | null): string {
   if (!tx) return "";
   const due = tx.due_date ? new Date(tx.due_date).getTime() : null;
-  const ret = tx.return_date ? new Date(tx.return_date).getTime() : null;
+  const returned = tx.return_date ? new Date(tx.return_date).getTime() : null;
   if (!due) return "No due date";
-  if (ret) return "Returned";
-  const now = Date.now();
-  const diffDays = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+  if (returned) return "Returned";
+  const diffDays = Math.ceil((due - Date.now()) / (1000 * 60 * 60 * 24));
   if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`;
   if (diffDays === 0) return "Due today";
   return `${diffDays}d left`;
@@ -24,8 +112,15 @@ function daysLabelFromTx(tx: any): string {
 
 function loadRazorpayScript(): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (typeof window === "undefined") return reject(new Error("Not in browser"));
-    if ((window as any).Razorpay) return resolve();
+    if (typeof window === "undefined") {
+      reject(new Error("Not in browser"));
+      return;
+    }
+    if (window.Razorpay) {
+      resolve();
+      return;
+    }
+
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
@@ -35,130 +130,148 @@ function loadRazorpayScript(): Promise<void> {
   });
 }
 
+async function authedFetch(url: string, init?: RequestInit) {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) {
+    throw new Error("Session expired. Please log in again.");
+  }
+
+  return fetch(url, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...(init?.headers ?? {}),
+    },
+  });
+}
+
 export default function UserFinesSection() {
-  const [fines, setFines] = useState<any[]>([]);
+  const [fines, setFines] = useState<FineRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [paying, setPaying] = useState(false);
   const [activeTab, setActiveTab] = useState<"unpaid" | "paid">("unpaid");
 
-  async function loadFines(active = true) {
+  async function loadFines(isActive = true) {
     setLoading(true);
+    setError(null);
+
     try {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData?.user?.id;
       if (!userId) {
-        setError("Not signed in");
-        setFines([]);
+        if (isActive) {
+          setError("Not signed in");
+          setFines([]);
+        }
         return;
       }
 
-      const { data, error: fetchErr } = await supabase
+      const { data, error: fetchError } = await supabase
         .from("fines")
         .select(
-          `id,amount,transaction_id,paid_at,created_at,transactions(id,issue_date,due_date,return_date,status,fine_amount,book_copies(id,location,access_url,books(id,title,author,cover_url,publisher)))`
+          "id,amount,transaction_id,paid_at,created_at,status,transactions(id,issue_date,due_date,return_date,status,fine_amount,book_copies(id,location,access_url,books(id,title,author,cover_url,publisher)))",
         )
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
-      if (!active) return;
-      if (fetchErr) {
-        console.error("fines load error", fetchErr);
+      if (!isActive) return;
+
+      if (fetchError) {
         setError("Could not load fines. Please try again later.");
         setFines([]);
         return;
       }
-      setFines(data ?? []);
-    } catch (e) {
-      console.error(e);
-      setError("Could not load fines");
+
+      setFines((data ?? []) as FineRow[]);
+    } catch (fetchError: unknown) {
+      if (!isActive) return;
+      const message = fetchError instanceof Error ? fetchError.message : "Could not load fines";
+      setError(message);
       setFines([]);
     } finally {
-      setLoading(false);
+      if (isActive) {
+        setLoading(false);
+      }
     }
   }
 
   useEffect(() => {
-    let active = true;
-    loadFines(active);
+    let isActive = true;
+    void loadFines(isActive);
     return () => {
-      active = false;
+      isActive = false;
     };
   }, []);
 
+  const unpaid = useMemo(() => fines.filter((fine) => !fine.paid_at), [fines]);
+  const paid = useMemo(() => fines.filter((fine) => Boolean(fine.paid_at)), [fines]);
+  const selectedTotal = useMemo(
+    () => selected.reduce((sum, id) => sum + (fines.find((fine) => fine.id === id)?.amount ?? 0), 0),
+    [fines, selected],
+  );
+
   function toggle(id: number) {
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+    setSelected((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]));
   }
 
   async function handlePay() {
-    if (selected.length === 0) return;
+    if (selected.length === 0 || paying) return;
+
     setPaying(true);
     try {
-      const total = selected.reduce((s, id) => s + (fines.find((x) => x.id === id)?.amount ?? 0), 0);
-
-      const createRes = await fetch("/api/razorpay/create-order", {
+      const createRes = await authedFetch("/api/razorpay/create-order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: Math.round(total * 100),
-          fines: selected,
-          userId: (await supabase.auth.getUser()).data?.user?.id,
-        }),
+        body: JSON.stringify({ fineIds: selected }),
       });
-      const payload = await createRes.json();
-      if (!payload?.order) throw new Error("Could not create order");
+      const orderPayload = (await createRes.json().catch(() => ({}))) as {
+        ok?: boolean;
+        key?: string;
+        order?: { id: string; amount: number; currency: string };
+        error?: string;
+      };
 
-      const options = {
-        key: payload.key,
-        amount: payload.order.amount,
-        currency: payload.order.currency,
-        name: "Intellilib",
-        order_id: payload.order.id,
-        handler: async function (response: any) {
-          const verifyRes = await fetch("/api/razorpay/verify", {
+      if (!createRes.ok || !orderPayload.order || !orderPayload.key) {
+        throw new Error(orderPayload.error ?? "Could not create payment order.");
+      }
+
+      await loadRazorpayScript();
+      if (!window.Razorpay) {
+        throw new Error("Payment library is unavailable.");
+      }
+
+      const rzp = new window.Razorpay({
+        key: orderPayload.key,
+        amount: orderPayload.order.amount,
+        currency: orderPayload.order.currency,
+        name: "IntelliLib",
+        description: `Library fine payment for ${selected.length} fine${selected.length > 1 ? "s" : ""}`,
+        order_id: orderPayload.order.id,
+        handler: async (response: RazorpaySuccessResponse) => {
+          const verifyRes = await authedFetch("/api/razorpay/verify", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...response,
-              orderId: payload.order.id,
-              fines: selected,
-              userId: (await supabase.auth.getUser()).data?.user?.id,
-            }),
+            body: JSON.stringify(response),
           });
-          const verify = await verifyRes.json();
-          if (verify?.ok) {
-            await loadFines();
-            setSelected([]);
-          } else {
-            console.error("verify failed", verify);
-            alert("Payment verification failed");
+          const verifyPayload = (await verifyRes.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+
+          if (!verifyRes.ok || !verifyPayload.ok) {
+            throw new Error(verifyPayload.error ?? "Payment verification failed.");
           }
+
+          toast.success("Payment successful.");
+          setSelected([]);
+          await loadFines();
         },
         theme: { color: "#7c3aed" },
-      } as any;
+      });
 
-      try {
-        await loadRazorpayScript();
-      } catch (e) {
-        alert("Payment failed: could not load payment library.");
-        setPaying(false);
-        return;
-      }
-
-      const RazorpayCtor = (window as any).Razorpay;
-      if (!RazorpayCtor) {
-        alert("Payment failed: Razorpay not available");
-        setPaying(false);
-        return;
-      }
-
-      // @ts-ignore global
-      const rzp = new RazorpayCtor(options);
       rzp.open();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      alert(msg);
+    } catch (paymentError: unknown) {
+      const message = paymentError instanceof Error ? paymentError.message : "Payment failed.";
+      toast.error(message);
     } finally {
       setPaying(false);
     }
@@ -174,104 +287,114 @@ export default function UserFinesSection() {
       {loading ? (
         <div>Loading fines…</div>
       ) : error ? (
-        <div className="text-red-500">{typeof error === "string" ? error : JSON.stringify(error)}</div>
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+          {error}
+        </div>
       ) : (
         <div>
-          {/* tabs */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div className="flex rounded-lg bg-surface/40 p-1">
               <button
+                type="button"
                 onClick={() => setActiveTab("unpaid")}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === "unpaid" ? "bg-white text-black" : "text-foreground/60"}`}
+                className={`rounded-md px-4 py-2 text-sm font-medium ${activeTab === "unpaid" ? "bg-white text-black" : "text-foreground/60"}`}
               >
                 Unpaid
               </button>
               <button
+                type="button"
                 onClick={() => setActiveTab("paid")}
-                className={`ml-2 px-4 py-2 rounded-md text-sm font-medium ${activeTab === "paid" ? "bg-white text-black" : "text-foreground/60"}`}
+                className={`ml-2 rounded-md px-4 py-2 text-sm font-medium ${activeTab === "paid" ? "bg-white text-black" : "text-foreground/60"}`}
               >
                 Paid
               </button>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="text-sm">Selected: {selected.length} • Total: {formatCurrency(selected.reduce((s, id) => s + (fines.find((x) => x.id === id)?.amount ?? 0), 0))}</div>
-              {activeTab === "unpaid" && (
+              <div className="text-sm">
+                Selected: {selected.length} • Total: {formatCurrency(selectedTotal)}
+              </div>
+              {activeTab === "unpaid" ? (
                 <button
-                  onClick={handlePay}
+                  type="button"
+                  onClick={() => void handlePay()}
                   disabled={selected.length === 0 || paying}
                   className="rounded-xl bg-purple-600 px-4 py-2 text-white disabled:opacity-50"
                 >
-                  Pay Selected
+                  {paying ? "Processing..." : "Pay Selected"}
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
 
           <div className="mt-4">
-            {(() => {
-              const unpaid = fines.filter((x) => !x.paid_at);
-              const paid = fines.filter((x) => !!x.paid_at);
+            {(activeTab === "unpaid" ? unpaid : paid).length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-black/20 bg-black/5 px-4 py-6 text-center text-sm text-foreground/60 dark:border-white/15 dark:bg-white/5">
+                {activeTab === "unpaid" ? "No unpaid fines." : "No paid fines."}
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {(activeTab === "unpaid" ? unpaid : paid).map((fine) => {
+                  const tx = pickOne(fine.transactions);
+                  const bookCopy = pickOne(tx?.book_copies);
+                  const book = pickOne(bookCopy?.books);
+                  const isPaid = Boolean(fine.paid_at);
 
-              const renderCard = (f: any) => {
-                const tx = f.transactions ?? f.transaction ?? null;
-                const bookCopy = tx?.book_copies ? pickOne(tx.book_copies) : null;
-                const book = bookCopy?.books ? pickOne(bookCopy.books) : null;
-                const isPaid = !!f.paid_at;
-                return (
-                  <div key={f.id} className="rounded-2xl border p-4">
-                    <div className="flex items-start gap-4">
-                      <div className="h-24 w-20 shrink-0 overflow-hidden rounded-md bg-black/5">
-                        {book?.cover_url ? (
-                          <img src={book.cover_url} alt={`${book.title} cover`} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-foreground/45">📚</div>
-                        )}
-                      </div>
+                  return (
+                    <div key={fine.id} className="rounded-2xl border p-4">
+                      <div className="flex items-start gap-4">
+                        <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded-md bg-black/5">
+                          {book?.cover_url ? (
+                            <Image
+                              src={book.cover_url}
+                              alt={`${book.title} cover`}
+                              fill
+                              sizes="80px"
+                              className="object-cover"
+                              unoptimized
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-foreground/45">BOOK</div>
+                          )}
+                        </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
-                            <p className="font-semibold truncate">{book?.title ?? "Fine"}</p>
-                            {book?.author ? <p className="text-sm text-foreground/60">by {book.author}</p> : null}
-                            <p className="mt-2 text-xs text-foreground/60">Issued: {tx?.issue_date ? new Date(tx.issue_date).toLocaleString() : "-"}</p>
-                            <p className="text-xs text-foreground/60">Due: {tx?.due_date ? new Date(tx.due_date).toLocaleDateString() : "-"} • {daysLabelFromTx(tx)}</p>
-                            <p className="mt-2 text-sm text-foreground/70">Fine detail: {f.transaction_id ? `Overdue charge` : "Fine"}</p>
-                            <p className="mt-1 text-xs text-foreground/60">Status: {isPaid ? "Paid" : (f.status ?? "pending")}</p>
-                            <p className="mt-1 text-xs text-foreground/60">Last paid: {isPaid ? new Date(f.paid_at).toLocaleString() : "N/A"}</p>
-                          </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold">{book?.title ?? "Fine"}</p>
+                              {book?.author ? <p className="text-sm text-foreground/60">by {book.author}</p> : null}
+                              <p className="mt-2 text-xs text-foreground/60">
+                                Issued: {tx?.issue_date ? new Date(tx.issue_date).toLocaleString() : "-"}
+                              </p>
+                              <p className="text-xs text-foreground/60">
+                                Due: {tx?.due_date ? new Date(tx.due_date).toLocaleDateString() : "-"} • {daysLabelFromTx(tx ?? null)}
+                              </p>
+                              <p className="mt-2 text-sm text-foreground/70">Status: {isPaid ? "Paid" : fine.status ?? "pending"}</p>
+                              <p className="mt-1 text-xs text-foreground/60">
+                                {isPaid ? `Paid on ${new Date(fine.paid_at ?? fine.created_at).toLocaleString()}` : "Awaiting payment"}
+                              </p>
+                            </div>
 
-                          <div className="shrink-0 text-right ml-4">
-                            <div className="text-lg font-semibold">{formatCurrency(f.amount)}</div>
-                            <label className="flex items-center gap-2 text-sm mt-2">
-                              <input type="checkbox" disabled={isPaid} checked={selected.includes(f.id)} onChange={() => toggle(f.id)} />
-                              <span className="ml-1">{isPaid ? "Paid" : "Pay"}</span>
-                            </label>
+                            <div className="ml-4 shrink-0 text-right">
+                              <div className="text-lg font-semibold">{formatCurrency(fine.amount)}</div>
+                              <label className="mt-2 flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  disabled={isPaid}
+                                  checked={selected.includes(fine.id)}
+                                  onChange={() => toggle(fine.id)}
+                                />
+                                <span>{isPaid ? "Paid" : "Pay"}</span>
+                              </label>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              };
-
-              if (activeTab === "unpaid") {
-                if (unpaid.length === 0) {
-                  return (
-                    <div className="rounded-2xl border border-dashed border-black/20 bg-black/5 px-4 py-6 text-center text-sm text-foreground/60 dark:border-white/15 dark:bg-white/5">No unpaid fines.</div>
                   );
-                }
-                return <div className="grid gap-4 sm:grid-cols-2">{unpaid.map(renderCard)}</div>;
-              }
-
-              // paid tab
-              if (paid.length === 0) {
-                return (
-                  <div className="rounded-2xl border border-dashed border-black/20 bg-black/5 px-4 py-6 text-center text-sm text-foreground/60 dark:border-white/15 dark:bg-white/5">No paid fines.</div>
-                );
-              }
-              return <div className="grid gap-4 sm:grid-cols-2">{paid.map(renderCard)}</div>;
-            })()}
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

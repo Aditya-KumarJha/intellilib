@@ -1,7 +1,16 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
 import UserPanelCard from "@/components/dashboard/user/UserPanelCard";
-import { actionRequiredItems } from "@/components/dashboard/user/data";
+import { supabase } from "@/lib/supabaseClient";
+
+type ActionMetrics = {
+  dueIn3Days: number;
+  overdue: number;
+  unpaidFineTotal: number;
+};
 
 const toneStyles = {
   red: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
@@ -10,6 +19,74 @@ const toneStyles = {
 };
 
 export default function ActionRequiredCard() {
+  const [metrics, setMetrics] = useState<ActionMetrics>({
+    dueIn3Days: 0,
+    overdue: 0,
+    unpaidFineTotal: 0,
+  });
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function load() {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+      if (!userId || !mounted) return;
+
+      const now = new Date();
+      const threeDaysAhead = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+      const [dueSoonRes, overdueRes, fineRes] = await Promise.all([
+        supabase
+          .from("transactions")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .is("return_date", null)
+          .gte("due_date", now.toISOString())
+          .lte("due_date", threeDaysAhead.toISOString()),
+        supabase
+          .from("transactions")
+          .select("id,due_date,status")
+          .eq("user_id", userId)
+          .is("return_date", null),
+        supabase
+          .from("fines")
+          .select("amount")
+          .eq("user_id", userId)
+          .is("paid_at", null),
+      ]);
+
+      if (!mounted) return;
+
+      const overdueCount = (overdueRes.data ?? []).filter((item) => {
+        const due = item.due_date ? new Date(item.due_date).getTime() : Number.POSITIVE_INFINITY;
+        return item.status === "overdue" || due < Date.now();
+      }).length;
+
+      const unpaidFineTotal = (fineRes.data ?? []).reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+
+      setMetrics({
+        dueIn3Days: Number(dueSoonRes.count ?? 0),
+        overdue: overdueCount,
+        unpaidFineTotal,
+      });
+    }
+
+    void load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const actionRequiredItems = useMemo(
+    () => [
+      { label: "Books due in 3 days", value: String(metrics.dueIn3Days), tone: "orange" as const },
+      { label: "Overdue books", value: String(metrics.overdue), tone: "red" as const },
+      { label: "Unpaid fine", value: `INR ${Math.round(metrics.unpaidFineTotal)}`, tone: "yellow" as const },
+    ],
+    [metrics],
+  );
+
   return (
     <UserPanelCard
       title="Action Required"

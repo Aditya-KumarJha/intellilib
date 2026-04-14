@@ -4,7 +4,9 @@ export type SearchFormatFilter = "all" | "physical" | "digital";
 
 export function mapBookRow(row: BookRow): SmartSearchBook {
   const copies = row.book_copies ?? [];
-  const availableCopies = copies.filter((copy) => copy.status === "available").length;
+  const rawAvailableCopies = copies.filter((copy) => copy.status === "available").length;
+  const approvedReservationCount = (row.reservations ?? []).filter((reservation) => reservation.status === "approved").length;
+  const availableCopies = Math.max(0, rawAvailableCopies - approvedReservationCount);
   const category = Array.isArray(row.categories)
     ? row.categories[0]?.name ?? null
     : row.categories?.name ?? null;

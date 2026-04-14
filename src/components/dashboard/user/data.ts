@@ -122,10 +122,10 @@ export const smartNotifications = [
 ];
 
 export const quickActions = [
-  { label: "Search Book", href: "/", icon: Search },
-  { label: "View My Books", href: "/dashboard/user", icon: BookOpen },
+  { label: "Search Book", href: "/dashboard/user/search", icon: Search },
+  { label: "View My Books", href: "/dashboard/user/my-books", icon: BookOpen },
   { label: "Pay Fine", href: "/dashboard/user/payments", icon: CreditCard },
-  { label: "Ask AI", href: "/dashboard/user", icon: Sparkles },
+  { label: "Ask AI", href: "/dashboard/user/assistant", icon: Sparkles },
 ];
 
 export const personalizedInsights = [
