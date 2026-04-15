@@ -271,8 +271,8 @@ export default function UserSmartSearchSection() {
         </div>
 
         <div className="mt-5 space-y-3">
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="relative block w-full md:max-w-md">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <label className="relative block w-full md:flex-[0.8]">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/45" />
               <input
                 ref={inputRef}
@@ -297,26 +297,30 @@ export default function UserSmartSearchSection() {
               ) : null}
             </label>
 
-            <div className="grid grid-cols-2 gap-3 w-full md:w-90">
-              <Dropdown
-                title="Format"
-                id="format"
-                name="format"
-                value={activeFormat}
-                onChange={(event) => {
-                  setActiveFormat(event.target.value as SearchFormatFilter);
-                }}
-                options={formatOptions.map((option) => ({ value: option.value, label: option.label }))}
-              />
+            <div className="flex items-center gap-3 md:ml-4 md:justify-end">
+              <div className="w-32 md:w-44">
+                <Dropdown
+                  title="Format"
+                  id="format"
+                  name="format"
+                  value={activeFormat}
+                  onChange={(event) => {
+                    setActiveFormat(event.target.value as SearchFormatFilter);
+                  }}
+                  options={formatOptions.map((option) => ({ value: option.value, label: option.label }))}
+                />
+              </div>
 
-              <Dropdown
-                title="Sort"
-                id="sort"
-                name="sort"
-                value={sortBy}
-                onChange={(event) => setSortBy(event.target.value as SearchSortOption)}
-                options={sortOptions.map((option) => ({ value: option.value, label: option.label }))}
-              />
+              <div className="w-36 md:w-56">
+                <Dropdown
+                  title="Sort"
+                  id="sort"
+                  name="sort"
+                  value={sortBy}
+                  onChange={(event) => setSortBy(event.target.value as SearchSortOption)}
+                  options={sortOptions.map((option) => ({ value: option.value, label: option.label }))}
+                />
+              </div>
             </div>
           </div>
 

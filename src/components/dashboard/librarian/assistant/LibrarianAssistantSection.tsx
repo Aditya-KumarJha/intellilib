@@ -13,6 +13,40 @@ type ChatMessage = {
   content: string;
 };
 
+type UserChoiceItem = {
+  id: string;
+  full_name: string | null;
+  email?: string | null;
+  status?: string | null;
+};
+
+type BookChoiceItem = {
+  id: number;
+  title: string | null;
+  author: string | null;
+  available_copies: number | null;
+  total_copies: number | null;
+};
+
+type AssistantChoices =
+  | { type: "user"; action: string; amount?: number; items: UserChoiceItem[] }
+  | { type: "book"; action: string; amount?: number; items: BookChoiceItem[] };
+
+type AssistantReplyPayload = {
+  reply?: string;
+  replyType?: "choose_user" | "choose_book";
+  action?: string;
+  candidates?: UserChoiceItem[] | BookChoiceItem[];
+  amount?: number;
+  error?: string;
+};
+
+type AssistantActionPayload = {
+  reply?: string;
+  message?: string;
+  error?: string;
+};
+
 const STARTER_PROMPTS = [
   "List low stock titles",
   "Show pending return requests",
@@ -100,7 +134,7 @@ export default function LibrarianAssistantSection() {
   ]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [choices, setChoices] = useState<null | { type: "user" | "book"; action: string; amount?: number; items: any[] }>(null);
+  const [choices, setChoices] = useState<AssistantChoices | null>(null);
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -129,17 +163,22 @@ export default function LibrarianAssistantSection() {
         body: JSON.stringify({ messages: nextMessages }),
       });
 
-      const payload = (await res.json().catch(() => ({}))) as { reply?: string; replyType?: string; action?: string; candidates?: any[]; amount?: number; error?: string };
+      const payload = (await res.json().catch(() => ({}))) as AssistantReplyPayload;
 
       if (!res.ok) {
         throw new Error(payload.error ?? "Assistant request failed");
       }
 
       if (payload.replyType === "choose_user") {
-        setChoices({ type: "user", action: String(payload.action ?? ""), items: payload.candidates ?? [] });
+        setChoices({ type: "user", action: String(payload.action ?? ""), items: (payload.candidates ?? []) as UserChoiceItem[] });
         setMessages((prev) => [...prev, { role: "assistant", content: "Multiple users matched. Please select one from the list below." }]);
       } else if (payload.replyType === "choose_book") {
-        setChoices({ type: "book", action: String(payload.action ?? ""), amount: payload.amount, items: payload.candidates ?? [] });
+        setChoices({
+          type: "book",
+          action: String(payload.action ?? ""),
+          amount: payload.amount,
+          items: (payload.candidates ?? []) as BookChoiceItem[],
+        });
         setMessages((prev) => [...prev, { role: "assistant", content: "Multiple books matched. Please select one from the list below." }]);
       } else {
         const reply = payload.reply ?? "I could not generate a response right now.";
@@ -167,7 +206,7 @@ export default function LibrarianAssistantSection() {
         body: JSON.stringify({ action, targetId, amount }),
       });
 
-      const payload = await res.json().catch(() => ({}));
+      const payload = (await res.json().catch(() => ({}))) as AssistantActionPayload;
       if (!res.ok) {
         throw new Error(payload.error ?? "Action failed");
       }
@@ -235,40 +274,40 @@ export default function LibrarianAssistantSection() {
 
             {choices ? (
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {choices.items.map((it: any) => (
-                  <div key={String(it.id)} className="rounded-lg border p-3 bg-white/90 dark:bg-black/20">
-                    {choices.type === "user" ? (
-                      <>
-                        <div className="font-semibold">{it.full_name}</div>
-                        <div className="text-xs text-foreground/60">ID: {it.id}</div>
-                        {it.email ? <div className="text-xs text-foreground/60">{it.email}</div> : null}
-                        <div className="mt-2 flex gap-2">
-                          <button
-                            className="rounded px-3 py-1 bg-amber-600 text-white text-sm"
-                            onClick={() => void performChoice(choices.action, it.id)}
-                          >
-                            {choices.action.replace(/_/g, " ")}
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="font-semibold">{it.title}</div>
-                        <div className="text-xs text-foreground/60">ID: {it.id}</div>
-                        <div className="text-xs text-foreground/60">{it.author}</div>
-                        <div className="text-xs text-foreground/60">{it.available_copies}/{it.total_copies}</div>
-                        <div className="mt-2 flex gap-2">
-                          <button
-                            className="rounded px-3 py-1 bg-amber-600 text-white text-sm"
-                            onClick={() => void performChoice(choices.action, it.id, choices.amount)}
-                          >
-                            {choices.action.replace(/_/g, " ")}
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
+                {choices.type === "user" ? (
+                  (choices.items as UserChoiceItem[]).map((user) => (
+                    <div key={String(user.id)} className="rounded-lg border p-3 bg-white/90 dark:bg-black/20">
+                      <div className="font-semibold">{user.full_name}</div>
+                      <div className="text-xs text-foreground/60">ID: {user.id}</div>
+                      {user.email ? <div className="text-xs text-foreground/60">{user.email}</div> : null}
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          className="rounded px-3 py-1 bg-amber-600 text-white text-sm"
+                          onClick={() => void performChoice(choices.action, user.id)}
+                        >
+                          {choices.action.replace(/_/g, " ")}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  (choices.items as BookChoiceItem[]).map((book) => (
+                    <div key={String(book.id)} className="rounded-lg border p-3 bg-white/90 dark:bg-black/20">
+                      <div className="font-semibold">{book.title ?? ""}</div>
+                      <div className="text-xs text-foreground/60">ID: {book.id}</div>
+                      <div className="text-xs text-foreground/60">{book.author ?? ""}</div>
+                      <div className="text-xs text-foreground/60">{book.available_copies ?? 0}/{book.total_copies ?? 0}</div>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          className="rounded px-3 py-1 bg-amber-600 text-white text-sm"
+                          onClick={() => void performChoice(choices.action, book.id, choices.amount)}
+                        >
+                          {choices.action.replace(/_/g, " ")}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             ) : null}
 

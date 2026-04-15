@@ -19,7 +19,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { id: "home", label: "Home", icon: Home, href: "/#home" },
-  { id: "search", label: "Search", icon: Search, href: "/#smart-search" },
+  { id: "search", label: "Search", icon: Search, href: "/search" },
   { id: "assistant", label: "AI Assistant", icon: Bot, href: "/#ai-assistant" },
   { id: "contact", label: "Contact", icon: Mail, href: "/#contact" },
 ];
@@ -27,6 +27,11 @@ const NAV_ITEMS: NavItem[] = [
 function scrollToHash(event: MouseEvent<HTMLAnchorElement>, href: string) {
   const hashIndex = href.indexOf("#");
   if (hashIndex === -1) {
+    return;
+  }
+
+  const pathPart = href.slice(0, hashIndex) || "/";
+  if (typeof window !== "undefined" && pathPart !== window.location.pathname) {
     return;
   }
 

@@ -1155,7 +1155,7 @@ export async function POST(req: Request) {
 
   // Early guard: if user is suspended and the latest message is an action (issue/reserve/return), block immediately.
   const maybeProfile = await supabaseAdmin.from("profiles").select("status").eq("id", user.id).maybeSingle();
-  const userStatus = maybeProfile?.data?.status ?? maybeProfile?.status ?? (maybeProfile as any)?.data?.status;
+  const userStatus = maybeProfile.data?.status ?? null;
   if (userStatus === "suspended" && isActionIntent(latestUserMessage)) {
     return NextResponse.json({ ok: true, reply: "Your account is suspended. I cannot perform issue, reservation, or return actions while your account is suspended. Please contact library staff to request reactivation." });
   }

@@ -6,9 +6,33 @@ import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { z } from "zod";
 
 import { getUserFromRequest } from "@/lib/server/apiAuth";
-import { getPendingReturnRequests, getDeskSeedData } from "@/lib/server/librarianCirculation";
+import { getPendingReturnRequests } from "@/lib/server/librarianCirculation";
 import { logAuditEvent } from "@/lib/server/auditLogs";
 import supabaseAdmin from "@/lib/supabaseServerClient";
+
+type BookRow = {
+  id: number;
+  title: string | null;
+  author: string | null;
+  available_copies: number | null;
+  total_copies: number | null;
+};
+
+type AssistantMessageLike = {
+  content?: unknown;
+  kwargs?: {
+    content?: unknown;
+  };
+};
+
+type AssistantResultShape = {
+  output?: unknown;
+  text?: unknown;
+  response?: unknown;
+  messages?: AssistantMessageLike[];
+  output_text?: unknown;
+  [key: string]: unknown;
+};
 
 const SYSTEM_PROMPT = `You are IntelliLib Librarian Assistant — a strict operational assistant for librarian staff.
 
@@ -284,7 +308,7 @@ function shouldAutoSelectTopCandidate(scored: Array<{ candidate: ProfileCandidat
   return top >= 2.4 && top - second >= 0.7;
 }
 
-function formatBookRow(row: any) {
+function formatBookRow(row: BookRow) {
   const title = String(row.title ?? "Untitled");
   const author = String(row.author ?? "Unknown");
   const available = Number(row.available_copies ?? 0);
@@ -301,7 +325,7 @@ async function fetchCandidateBooks(query: string) {
     .select("id,title,author,available_copies,total_copies")
     .or(`title.ilike.${like},author.ilike.${like}`)
     .limit(60);
-  return (data ?? []) as any[];
+  return (data ?? []) as BookRow[];
 }
 
 async function incrementBookCopies(bookId: number, delta: number) {
@@ -395,7 +419,7 @@ function extractAssistantText(result: unknown): string {
     // If it's already a string
     if (typeof result === "string") return result;
 
-    const obj = result as any;
+    const obj = result as AssistantResultShape;
 
     // If agent returns an AIMessage-like object
     if (obj instanceof AIMessage && typeof obj.content === "string") return obj.content;
@@ -452,7 +476,7 @@ function createTools(userId: string) {
         .select("id,title,author,available_copies,total_copies")
         .order("available_copies", { ascending: false })
         .limit(Math.min(200, Number(limit || 20)));
-      const rows = (data ?? []) as any[];
+      const rows = (data ?? []) as BookRow[];
       return rows.map(formatBookRow).slice(0, 50).join("\n");
     },
     {
@@ -464,10 +488,10 @@ function createTools(userId: string) {
 
   const addCopiesTool = tool(
     async ({ book_id, query, amount }: { book_id?: number; query?: string; amount: number }) => {
-      let book: any | null = null;
+      let book: BookRow | null = null;
       if (book_id) {
         const { data } = await supabaseAdmin.from("books").select("id,title,author,available_copies,total_copies").eq("id", book_id).maybeSingle();
-        book = data ?? null;
+        book = (data as BookRow | null) ?? null;
       } else if (query) {
         const candidates = await fetchCandidateBooks(query);
         book = candidates[0] ?? null;
@@ -486,10 +510,10 @@ function createTools(userId: string) {
 
   const removeCopiesTool = tool(
     async ({ book_id, query, amount }: { book_id?: number; query?: string; amount: number }) => {
-      let book: any | null = null;
+      let book: BookRow | null = null;
       if (book_id) {
         const { data } = await supabaseAdmin.from("books").select("id,title,author,available_copies,total_copies").eq("id", book_id).maybeSingle();
-        book = data ?? null;
+        book = (data as BookRow | null) ?? null;
       } else if (query) {
         const candidates = await fetchCandidateBooks(query);
         book = candidates[0] ?? null;
@@ -632,7 +656,7 @@ export async function POST(req: Request) {
         .eq("role", "user")
         .order("created_at", { ascending: false })
         .limit(500);
-      const users = (rows ?? []) as any[];
+      const users = (rows ?? []) as ProfileCandidate[];
       if (!users.length) return NextResponse.json({ ok: true, reply: "No users found." });
       const lines = users.map((u) => `${u.full_name ?? u.id} — ${u.id}${u.email ? ` — ${u.email}` : ""} — ${u.status ?? "active"}`);
       return NextResponse.json({ ok: true, reply: lines.join("\n") });
@@ -663,10 +687,9 @@ export async function POST(req: Request) {
       if (!res) return NextResponse.json({ ok: true, reply: `Could not approve return request ${reqId}.` });
       return NextResponse.json({ ok: true, reply: `Return request ${reqId} approved.` });
     }
-  } catch (err) {
+  } catch (error) {
     // If pre-handling fails, return a helpful message rather than falling through to the agent to avoid recursion issues.
-    // eslint-disable-next-line no-console
-    console.error("Prehandle error:", err);
+    console.error("Prehandle error:", error);
     return NextResponse.json({ ok: false, reply: "Could not process your request deterministically; please try rephrasing or run the command by id." });
   }
 
@@ -692,13 +715,13 @@ export async function POST(req: Request) {
     console.error("Librarian assistant failed:", error);
     // Detect recursion errors from langgraph and return a helpful assistant-style reply instead of 500.
     try {
-      const anyErr = error as any;
-      const code = anyErr?.lc_error_code ?? anyErr?.code ?? "";
-      const msg = String(anyErr?.message ?? anyErr ?? "");
+      const maybeError = error as { lc_error_code?: unknown; code?: unknown; message?: unknown };
+      const code = String(maybeError.lc_error_code ?? maybeError.code ?? "");
+      const msg = String(maybeError.message ?? error ?? "");
       if (code === "GRAPH_RECURSION_LIMIT" || msg.includes("Recursion limit")) {
         return NextResponse.json({ ok: true, reply: "Assistant reached its recursion limit while trying to answer. Please try a direct command (for example: 'Suspend user <user_id>' or 'Add 3 copies of <book title>') or select the matching candidate when prompted." });
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
 
