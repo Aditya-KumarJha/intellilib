@@ -6,6 +6,7 @@ import AnalyticsPage from "@/components/dashboard/librarian/analytics/AnalyticsP
 import RequestsPage from "@/components/dashboard/librarian/requests/RequestsPage";
 import MembersPage from "@/components/dashboard/librarian/members/MembersPage";
 import CirculationPage from "@/components/dashboard/librarian/circulation/CirculationPage";
+import CatalogSection from "@/components/dashboard/librarian/catalog/CatalogSection";
 
 type PageProps = {
   params: Promise<{ section: string }>;
@@ -31,6 +32,10 @@ export default async function LibrarianDashboardSectionPage({ params }: PageProp
   if (safeSection === "members") {
     return <MembersPage />;
   }
+
+    if (safeSection === "catalog") {
+      return <CatalogSection />;
+    }
 
   if (safeSection === "circulation") {
     return <CirculationPage />;
