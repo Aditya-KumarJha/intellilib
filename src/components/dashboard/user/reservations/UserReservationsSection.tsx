@@ -62,9 +62,9 @@ export default function UserReservationsSection() {
     let active = true;
 
     async function resolveUser() {
-      const { data } = await supabase.auth.getUser();
+      const { data } = await supabase.auth.getSession();
       if (!active) return;
-      setUserId(data.user?.id ?? null);
+      setUserId(data.session?.user?.id ?? null);
     }
 
     void resolveUser();

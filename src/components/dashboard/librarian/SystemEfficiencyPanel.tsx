@@ -1,7 +1,16 @@
-import LibrarianPanelCard from "@/components/dashboard/librarian/LibrarianPanelCard";
-import { systemEfficiencyMetrics } from "@/components/dashboard/librarian/data";
+import { Activity, Clock3, RotateCcw, Timer } from "lucide-react";
 
-export default function SystemEfficiencyPanel() {
+import LibrarianPanelCard from "@/components/dashboard/librarian/LibrarianPanelCard";
+import type { LibrarianSnapshotItem } from "@/components/dashboard/librarian/useLibrarianDashboardData";
+
+const efficiencyIcons = [Timer, RotateCcw, Activity, Clock3];
+
+type SystemEfficiencyPanelProps = {
+  items: LibrarianSnapshotItem[];
+  loading?: boolean;
+};
+
+export default function SystemEfficiencyPanel({ items, loading = false }: SystemEfficiencyPanelProps) {
   return (
     <LibrarianPanelCard
       title="System Efficiency Metrics"
@@ -10,8 +19,8 @@ export default function SystemEfficiencyPanel() {
       delay={0.24}
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        {systemEfficiencyMetrics.map((item) => {
-          const Icon = item.icon;
+        {items.map((item, idx) => {
+          const Icon = efficiencyIcons[idx] ?? Timer;
           return (
             <article
               key={item.label}
@@ -21,8 +30,8 @@ export default function SystemEfficiencyPanel() {
                 <Icon className="h-4 w-4 text-sky-600 dark:text-sky-300" aria-hidden />
                 {item.label}
               </p>
-              <p className="mt-2 text-lg font-semibold text-foreground">{item.value}</p>
-              <p className="text-xs text-foreground/60">{item.hint}</p>
+              <p className="mt-2 text-lg font-semibold text-foreground">{loading ? "--" : item.value}</p>
+              <p className="text-xs text-foreground/60">{loading ? "Loading system metrics..." : item.hint}</p>
             </article>
           );
         })}

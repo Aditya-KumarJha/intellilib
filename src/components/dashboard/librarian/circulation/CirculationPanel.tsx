@@ -24,10 +24,6 @@ export default async function CirculationPanel() {
         subtitle="Desk operations with live availability, queue-safe issuing, and return processing."
         className="w-full mx-auto"
       >
-        <p className="mb-4 text-sm text-foreground/60">
-          This section is wired to real Supabase data for transactions, return requests, and member/book availability.
-        </p>
-
         <CirculationStatsRow summary={summary} />
 
         <div className="mt-5">

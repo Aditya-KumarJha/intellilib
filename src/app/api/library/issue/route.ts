@@ -262,7 +262,9 @@ export async function POST(req: Request) {
     if (Array.isArray(staff) && staff.length > 0) {
       const inserts = (staff as { id: string }[]).map((s) => ({
         user_id: s.id,
-        type: "book_issued",
+        // use an allowed notification type (schema-enforced). 'reservation_update'
+        // is a generic librarian-facing type used elsewhere.
+        type: "reservation_update",
         message,
         is_read: false,
         target_role: "librarian",

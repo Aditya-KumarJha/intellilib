@@ -93,8 +93,8 @@ export default function OtpForm({ email, context, onVerified }: Props) {
         throw error;
       }
 
-      const { data } = await supabase.auth.getUser();
-      const authUser = toAuthUser(data?.user);
+      const { data } = await supabase.auth.getSession();
+      const authUser = toAuthUser(data?.session?.user ?? null);
       if (authUser) {
         setUser(authUser);
       } else if (context !== "forgot") {

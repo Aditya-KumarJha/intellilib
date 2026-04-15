@@ -1,7 +1,16 @@
-import LibrarianPanelCard from "@/components/dashboard/librarian/LibrarianPanelCard";
-import { memberActivityInsights } from "@/components/dashboard/librarian/data";
+import { BookOpenCheck, ShieldAlert, UserPlus, Users } from "lucide-react";
 
-export default function MemberActivityInsightsPanel() {
+import LibrarianPanelCard from "@/components/dashboard/librarian/LibrarianPanelCard";
+import type { LibrarianSnapshotItem } from "@/components/dashboard/librarian/useLibrarianDashboardData";
+
+const insightIcons = [Users, UserPlus, BookOpenCheck, ShieldAlert];
+
+type MemberActivityInsightsPanelProps = {
+  items: LibrarianSnapshotItem[];
+  loading?: boolean;
+};
+
+export default function MemberActivityInsightsPanel({ items, loading = false }: MemberActivityInsightsPanelProps) {
   return (
     <LibrarianPanelCard
       title="Member Activity Insights"
@@ -10,8 +19,8 @@ export default function MemberActivityInsightsPanel() {
       delay={0.16}
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        {memberActivityInsights.map((item) => {
-          const Icon = item.icon;
+        {items.map((item, idx) => {
+          const Icon = insightIcons[idx] ?? Users;
           return (
             <article
               key={item.label}
@@ -21,8 +30,8 @@ export default function MemberActivityInsightsPanel() {
                 <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-300" aria-hidden />
                 {item.label}
               </p>
-              <p className="mt-2 text-lg font-semibold text-foreground">{item.value}</p>
-              <p className="text-xs text-foreground/60">{item.hint}</p>
+              <p className="mt-2 text-lg font-semibold text-foreground">{loading ? "--" : item.value}</p>
+              <p className="text-xs text-foreground/60">{loading ? "Loading member data..." : item.hint}</p>
             </article>
           );
         })}

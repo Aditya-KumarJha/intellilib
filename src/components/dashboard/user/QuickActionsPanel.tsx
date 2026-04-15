@@ -20,8 +20,8 @@ export default function QuickActionsPanel() {
     let mounted = true;
 
     async function load() {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
+      const { data: userData } = await supabase.auth.getSession();
+      const userId = userData?.session?.user?.id;
       if (!userId || !mounted) return;
 
       const [activeBooksRes, unpaidFinesRes] = await Promise.all([

@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { AlertCircle, CheckCircle2, RefreshCcw, Search } from "lucide-react";
+import { useMemo, useRef, useState, useTransition, useEffect } from "react";
+import { AlertCircle, CheckCircle2, RefreshCcw, Search, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 
@@ -13,6 +13,8 @@ import type {
   PendingReturnRequest,
 } from "@/lib/server/librarianCirculation";
 import { supabase } from "@/lib/supabaseClient";
+import Dropdown from "@/components/common/Dropdown";
+import PaginationControls from "@/components/common/PaginationControls";
 
 type Props = {
   summary: CirculationSummary;
@@ -82,8 +84,20 @@ export default function CirculationDesk({
   const [isPending, startTransition] = useTransition();
   const [memberId, setMemberId] = useState("");
   const [bookId, setBookId] = useState("");
+  const [memberQuery, setMemberQuery] = useState("");
+  const [bookQuery, setBookQuery] = useState("");
+  const [showMemberList, setShowMemberList] = useState(false);
+  const [showBookList, setShowBookList] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "issued" | "overdue" | "returned">("all");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  const statusOptions = [
+    { value: "all", label: "All status" },
+    { value: "issued", label: "Issued" },
+    { value: "overdue", label: "Overdue" },
+    { value: "returned", label: "Returned" },
+  ];
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -102,6 +116,29 @@ export default function CirculationDesk({
       );
     });
   }, [recentRows, query, statusFilter]);
+
+  // Pagination for recentRows
+  const [page, setPage] = useState(1);
+  const perPage = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / perPage));
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter, recentRows]);
+
+  const display = filteredRows.slice((page - 1) * perPage, page * perPage);
+
+  const filteredMembers = useMemo(() => {
+    const q = memberQuery.trim().toLowerCase();
+    if (!q) return members;
+    return members.filter((m) => m.name.toLowerCase().includes(q) || String(m.id).includes(q));
+  }, [members, memberQuery]);
+
+  const filteredBooks = useMemo(() => {
+    const q = bookQuery.trim().toLowerCase();
+    if (!q) return books;
+    return books.filter((b) => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q) || String(b.id).includes(q));
+  }, [books, bookQuery]);
 
   const handleIssue = () => {
     if (!memberId || !bookId) {
@@ -164,36 +201,87 @@ export default function CirculationDesk({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1">
+            <label className="space-y-1 relative">
               <span className="text-xs font-medium text-foreground/65">Member</span>
-              <select
-                value={memberId}
-                onChange={(event) => setMemberId(event.target.value)}
+              <input
+                value={(memberQuery || members.find((m) => String(m.id) === memberId)?.name) ?? ""}
+                onChange={(e) => {
+                  setMemberQuery(e.target.value);
+                  setShowMemberList(true);
+                }}
+                onFocus={() => setShowMemberList(true)}
+                onBlur={() => setTimeout(() => setShowMemberList(false), 150)}
+                placeholder="Type name or id"
                 className="h-11 w-full rounded-xl border border-black/10 bg-white/70 px-3 text-sm text-foreground outline-none transition focus:border-purple-500/40 focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-white/10"
-              >
-                <option value="">Select member</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
+              />
+
+              {showMemberList && (
+                <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg border bg-white/90 py-1 text-sm shadow-lg dark:bg-black/80 divide-y divide-black/5 dark:divide-white/5">
+                  <li className="px-3 py-2 text-xs text-foreground/60">{filteredMembers.length} result{filteredMembers.length !== 1 ? "s" : ""}</li>
+                  {filteredMembers.length === 0 ? (
+                    <li className="px-3 py-3 text-foreground/60">No members match</li>
+                  ) : (
+                    filteredMembers.map((member) => (
+                      <li
+                        key={member.id}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setMemberId(member.id);
+                          setMemberQuery(member.name);
+                          setShowMemberList(false);
+                        }}
+                        className={`flex items-center justify-between cursor-pointer px-3 py-3 hover:bg-black/5 dark:hover:bg-white/5 ${String(member.id) === String(memberId) ? 'bg-black/5 dark:bg-white/5' : ''}`}
+                      >
+                        <span className="truncate">{member.name}</span>
+                        <span className="ml-3 text-xs text-foreground/50">#{member.id}</span>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
             </label>
 
-            <label className="space-y-1">
+            <label className="space-y-1 relative">
               <span className="text-xs font-medium text-foreground/65">Book</span>
-              <select
-                value={bookId}
-                onChange={(event) => setBookId(event.target.value)}
+              <input
+                value={(bookQuery || books.find((b) => String(b.id) === bookId)?.title) ?? ""}
+                onChange={(e) => {
+                  setBookQuery(e.target.value);
+                  setShowBookList(true);
+                }}
+                onFocus={() => setShowBookList(true)}
+                onBlur={() => setTimeout(() => setShowBookList(false), 150)}
+                placeholder="Type title or author"
                 className="h-11 w-full rounded-xl border border-black/10 bg-white/70 px-3 text-sm text-foreground outline-none transition focus:border-purple-500/40 focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-white/10"
-              >
-                <option value="">Select available title</option>
-                {books.map((book) => (
-                  <option key={book.id} value={book.id}>
-                    {book.title} - {book.author} ({book.availableCopies})
-                  </option>
-                ))}
-              </select>
+              />
+
+              {showBookList && (
+                <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg border bg-white/90 py-1 text-sm shadow-lg dark:bg-black/80 divide-y divide-black/5 dark:divide-white/5">
+                  <li className="px-3 py-2 text-xs text-foreground/60">{filteredBooks.length} result{filteredBooks.length !== 1 ? "s" : ""}</li>
+                  {filteredBooks.length === 0 ? (
+                    <li className="px-3 py-3 text-foreground/60">No books match</li>
+                  ) : (
+                    filteredBooks.map((book) => (
+                      <li
+                        key={book.id}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setBookId(String(book.id));
+                          setBookQuery(book.title);
+                          setShowBookList(false);
+                        }}
+                        className={`flex items-center justify-between cursor-pointer px-3 py-3 hover:bg-black/5 dark:hover:bg-white/5 ${String(book.id) === String(bookId) ? 'bg-black/5 dark:bg-white/5' : ''}`}
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{book.title}</div>
+                          <div className="truncate text-xs text-foreground/60">{book.author}</div>
+                        </div>
+                        <div className="ml-3 shrink-0 text-xs text-foreground/50">{book.availableCopies}</div>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
             </label>
           </div>
 
@@ -262,27 +350,42 @@ export default function CirculationDesk({
           </button>
         </div>
 
-        <div className="mb-3 grid gap-3 md:grid-cols-[1fr_180px]">
-          <label className="relative block">
+        <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center">
+          <label className="relative block md:flex-[0.7]">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/45" />
             <input
+              ref={searchInputRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search by member, title, or transaction id"
-              className="h-10 w-full rounded-xl border border-black/10 bg-white/70 pl-10 pr-3 text-sm text-foreground outline-none transition focus:border-purple-500/40 focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-white/10"
+              className="h-12 w-full rounded-xl border border-black/10 bg-white/70 pl-10 pr-10 text-sm text-foreground outline-none transition focus:border-purple-500/40 focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-white/10"
             />
+
+            {query ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery("");
+                  searchInputRef.current?.focus();
+                }}
+                aria-label="Clear search"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-foreground/60 hover:text-foreground/80"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
           </label>
 
-          <select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as "all" | "issued" | "overdue" | "returned")}
-            className="h-10 rounded-xl border border-black/10 bg-white/70 px-3 text-sm text-foreground outline-none transition focus:border-purple-500/40 focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-white/10"
-          >
-            <option value="all">All status</option>
-            <option value="issued">Issued</option>
-            <option value="overdue">Overdue</option>
-            <option value="returned">Returned</option>
-          </select>
+          <div className="w-full md:ml-auto md:w-45">
+            <Dropdown
+              title="All status"
+              options={statusOptions}
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as "all" | "issued" | "overdue" | "returned")}
+              id="statusFilter"
+              name="statusFilter"
+            />
+          </div>
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-black/10 bg-white/70 dark:border-white/10 dark:bg-white/5">
@@ -299,7 +402,7 @@ export default function CirculationDesk({
               </tr>
             </thead>
             <tbody>
-              {filteredRows.length === 0 ? (
+              {display.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-foreground/55">
                     <div className="inline-flex items-center gap-2">
@@ -309,7 +412,7 @@ export default function CirculationDesk({
                   </td>
                 </tr>
               ) : (
-                filteredRows.map((row) => {
+                display.map((row) => {
                   const canReturn = row.status === "issued" || row.status === "overdue";
 
                   return (
@@ -350,6 +453,15 @@ export default function CirculationDesk({
             </tbody>
           </table>
         </div>
+          <div className="mt-2 flex items-center justify-end">
+            <PaginationControls
+              currentPage={page}
+              totalPages={totalPages}
+              onPrev={() => setPage((p) => Math.max(1, p - 1))}
+              onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onJump={(p) => setPage(p)}
+            />
+          </div>
       </div>
     </div>
   );

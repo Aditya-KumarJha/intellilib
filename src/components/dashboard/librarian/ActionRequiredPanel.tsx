@@ -1,5 +1,9 @@
+import { AlertTriangle, CircleSlash, RotateCcw, Users } from "lucide-react";
+
 import LibrarianPanelCard from "@/components/dashboard/librarian/LibrarianPanelCard";
-import { actionRequiredItems } from "@/components/dashboard/librarian/data";
+import type { LibrarianActionItem } from "@/components/dashboard/librarian/useLibrarianDashboardData";
+
+const actionIcons = [AlertTriangle, Users, CircleSlash, RotateCcw];
 
 const toneStyles = {
   red: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
@@ -8,7 +12,12 @@ const toneStyles = {
   blue: "border-blue-500/35 bg-blue-500/10 text-blue-700 dark:text-blue-300",
 };
 
-export default function ActionRequiredPanel() {
+type ActionRequiredPanelProps = {
+  items: LibrarianActionItem[];
+  loading?: boolean;
+};
+
+export default function ActionRequiredPanel({ items, loading = false }: ActionRequiredPanelProps) {
   return (
     <LibrarianPanelCard
       title="Action Required"
@@ -17,8 +26,8 @@ export default function ActionRequiredPanel() {
       delay={0.05}
     >
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {actionRequiredItems.map((item) => {
-          const Icon = item.icon;
+        {items.map((item, idx) => {
+          const Icon = actionIcons[idx] ?? AlertTriangle;
           return (
             <article
               key={item.label}
@@ -35,7 +44,7 @@ export default function ActionRequiredPanel() {
                 </span>
                 <p className="text-sm font-medium text-foreground">{item.label}</p>
               </div>
-              <p className="text-sm font-semibold text-foreground">{item.value}</p>
+              <p className="text-sm font-semibold text-foreground">{loading ? "--" : item.value}</p>
             </article>
           );
         })}

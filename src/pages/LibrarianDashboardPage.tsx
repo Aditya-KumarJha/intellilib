@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 
 import ActionRequiredPanel from "@/components/dashboard/librarian/ActionRequiredPanel";
 import LibrarianStatsRow from "@/components/dashboard/librarian/LibrarianStatsRow";
+import { useLibrarianDashboardData } from "@/components/dashboard/librarian/useLibrarianDashboardData";
 
 const panelFallback = <div className="h-56 w-full animate-pulse rounded-2xl border border-black/10 bg-white/60 dark:border-white/10 dark:bg-white/5" />;
 
@@ -28,20 +29,24 @@ const SystemEfficiencyPanel = dynamic(
   () => import("@/components/dashboard/librarian/SystemEfficiencyPanel"),
   { loading: () => panelFallback }
 );
-const MiniTrendsPanel = dynamic(
-  () => import("@/components/dashboard/librarian/MiniTrendsPanel"),
-  { loading: () => panelFallback }
-);
 const QuickActionsPanel = dynamic(
   () => import("@/components/dashboard/librarian/QuickActionsPanel"),
   { loading: () => panelFallback }
 );
+
+const MiniTrendsPanel = dynamic(
+  () => import("@/components/dashboard/librarian/MiniTrendsPanel"),
+  { loading: () => panelFallback }
+);
+
 const NotificationsPreviewPanel = dynamic(
   () => import("@/components/dashboard/librarian/NotificationsPreviewPanel"),
   { loading: () => panelFallback }
 );
 
 export default function LibrarianDashboardPage() {
+  const { data, loading, error } = useLibrarianDashboardData();
+
   return (
     <div className="space-y-6">
       <div>
@@ -63,27 +68,33 @@ export default function LibrarianDashboardPage() {
         </motion.p>
       </div>
 
-      <LibrarianStatsRow />
-      <ActionRequiredPanel />
+      {error ? (
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+          Live dashboard data could not be fully loaded: {error}
+        </div>
+      ) : null}
+
+      <LibrarianStatsRow items={data.kpis} loading={loading} />
+      <ActionRequiredPanel items={data.actionRequired} loading={loading} />
 
       <div className="grid gap-4 md:grid-cols-2 items-stretch">
-        <LiveActivityFeedPanel />
-        <InventorySnapshotPanel />
+        <LiveActivityFeedPanel items={data.liveActivity} loading={loading} />
+        <InventorySnapshotPanel items={data.inventorySnapshot} loading={loading} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 items-stretch">
-        <MemberActivityInsightsPanel />
-        <FinancialSnapshotPanel />
+        <MemberActivityInsightsPanel items={data.memberInsights} loading={loading} />
+        <FinancialSnapshotPanel items={data.financialSnapshot} loading={loading} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 items-stretch">
-        <SystemEfficiencyPanel />
-        <MiniTrendsPanel />
+        <SystemEfficiencyPanel items={data.systemEfficiency} loading={loading} />
+        <MiniTrendsPanel trends={data.miniTrends} loading={loading} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 items-stretch">
         <QuickActionsPanel />
-        <NotificationsPreviewPanel />
+        <NotificationsPreviewPanel items={data.notificationsPreview} loading={loading} />
       </div>
     </div>
   );

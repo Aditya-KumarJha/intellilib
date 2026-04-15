@@ -1,12 +1,8 @@
-import DashboardSectionPlaceholder from "@/components/dashboard/DashboardSectionPlaceholder";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+
 import { getSectionMeta, isValidDashboardSection, getDashboardNav } from "@/lib/dashboardNav";
-import NotificationsSection from "@/components/dashboard/librarian/notifications/NotificationsSection";
-import AuditLogSection from "@/components/dashboard/librarian/audit/AuditLogSection";
-import AnalyticsPage from "@/components/dashboard/librarian/analytics/AnalyticsPage";
-import RequestsPage from "@/components/dashboard/librarian/requests/RequestsPage";
-import MembersPage from "@/components/dashboard/librarian/members/MembersPage";
-import CirculationPage from "@/components/dashboard/librarian/circulation/CirculationPage";
-import CatalogSection from "@/components/dashboard/librarian/catalog/CatalogSection";
+import { buildMetadata } from "@/lib/seo";
 
 type PageProps = {
   params: Promise<{ section: string }>;
@@ -20,54 +16,78 @@ export function generateStaticParams() {
     }));
 }
 
+export async function generateMetadata({ params }: { params: Promise<{ section: string }> }): Promise<Metadata> {
+  const { section } = await params;
+  const safeSection = section.trim().toLowerCase();
+
+  if (!isValidDashboardSection("librarian", safeSection)) {
+    return buildMetadata({
+      title: "Librarian Dashboard",
+      description: "Private librarian dashboard section.",
+      path: "/dashboard/librarian",
+      noIndex: true,
+    });
+  }
+
+  const meta = getSectionMeta("librarian", safeSection);
+  const sectionLabel = meta?.label ?? "Librarian Dashboard";
+  const sectionDescription = meta?.description ?? "Private librarian dashboard section.";
+
+  return buildMetadata({
+    title: `${sectionLabel} - Librarian Dashboard`,
+    description: sectionDescription,
+    path: `/dashboard/librarian/${safeSection}`,
+    noIndex: true,
+  });
+}
+
 export default async function LibrarianDashboardSectionPage({ params }: PageProps) {
   const { section } = await params;
   const safeSection = section.trim().toLowerCase();
+  if (!isValidDashboardSection("librarian", safeSection)) {
+    notFound();
+  }
+
   const meta = getSectionMeta("librarian", safeSection);
 
+  if (!meta) {
+    notFound();
+  }
+
   if (safeSection === "notifications") {
-    return <NotificationsSection />;
+    const Component = (await import("@/components/dashboard/librarian/notifications/NotificationsSection")).default;
+    return <Component />;
   }
 
   if (safeSection === "members") {
-    return <MembersPage />;
+    const Component = (await import("@/components/dashboard/librarian/members/MembersPage")).default;
+    return <Component />;
   }
 
-    if (safeSection === "catalog") {
-      return <CatalogSection />;
-    }
+  if (safeSection === "catalog") {
+    const Component = (await import("@/components/dashboard/librarian/catalog/CatalogSection")).default;
+    return <Component />;
+  }
 
   if (safeSection === "circulation") {
-    return <CirculationPage />;
+    const Component = (await import("@/components/dashboard/librarian/circulation/CirculationPage")).default;
+    return <Component />;
   }
 
   if (safeSection === "audit") {
-    return <AuditLogSection />;
+    const Component = (await import("@/components/dashboard/librarian/audit/AuditLogSection")).default;
+    return <Component />;
   }
 
   if (safeSection === "analytics") {
-    return <AnalyticsPage />;
+    const Component = (await import("@/components/dashboard/librarian/analytics/AnalyticsPage")).default;
+    return <Component />;
   }
 
   if (safeSection === "requests") {
-    return <RequestsPage />;
+    const Component = (await import("@/components/dashboard/librarian/requests/RequestsPage")).default;
+    return <Component />;
   }
 
-  if (!isValidDashboardSection("librarian", safeSection)) {
-    return (
-      <DashboardSectionPlaceholder
-        role="librarian"
-        title="Section"
-        description={`This section (${safeSection}) is not available yet.`}
-      />
-    );
-  }
-
-  return (
-    <DashboardSectionPlaceholder
-      role="librarian"
-      title={meta?.label ?? "Section"}
-      description={meta?.description ?? `This section (${safeSection}) is not available yet.`}
-    />
-  );
+  notFound();
 }

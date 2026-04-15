@@ -1,6 +1,6 @@
 import React from "react";
 
-import styles from "@/components/dashboard/user/search/Dropdown.module.css";
+import styles from "@/styles/Dropdown.module.css";
 
 type DropdownOption = {
   value: string;

@@ -26,8 +26,8 @@ export default function NotificationsSection() {
     let mounted = true;
     async function load() {
       setLoading(true);
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
+      const { data: userData } = await supabase.auth.getSession();
+      const userId = userData?.session?.user?.id;
       if (!userId) {
         setNotes([]);
         setLoading(false);
@@ -66,8 +66,8 @@ export default function NotificationsSection() {
     // realtime — create a unique channel name so multiple mounts won't collide
     let channel: ReturnType<typeof supabase.channel> | null = null;
     (async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
+      const { data: userData } = await supabase.auth.getSession();
+      const userId = userData?.session?.user?.id;
       if (!userId) return;
       const channelName = `notifications-${userId}-${Date.now()}`;
       channel = supabase

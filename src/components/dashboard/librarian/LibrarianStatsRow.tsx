@@ -1,12 +1,20 @@
 import { motion } from "framer-motion";
+import { Activity, BookOpenCheck, RotateCcw } from "lucide-react";
 
-import { librarianMiniKpis } from "@/components/dashboard/librarian/data";
+import type { LibrarianMetricItem } from "@/components/dashboard/librarian/useLibrarianDashboardData";
 
-export default function LibrarianStatsRow() {
+const kpiIcons = [Activity, BookOpenCheck, RotateCcw];
+
+type LibrarianStatsRowProps = {
+  items: LibrarianMetricItem[];
+  loading?: boolean;
+};
+
+export default function LibrarianStatsRow({ items, loading = false }: LibrarianStatsRowProps) {
   return (
     <div className="grid gap-3 sm:grid-cols-3">
-      {librarianMiniKpis.map((item, idx) => {
-        const Icon = item.icon;
+      {items.map((item, idx) => {
+        const Icon = kpiIcons[idx] ?? Activity;
         return (
           <motion.article
             key={item.label}
@@ -19,7 +27,7 @@ export default function LibrarianStatsRow() {
               <Icon className="h-4 w-4" aria-hidden />
               <span>{item.label}</span>
             </div>
-            <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{item.value}</p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{loading ? "--" : item.value}</p>
           </motion.article>
         );
       })}

@@ -29,8 +29,9 @@ export default function RoleGuard({ allowedRole, children }: RoleGuardProps) {
   useEffect(() => {
     const verifyRoleAccess = async () => {
       try {
-        const { data, error: authError } = await supabase.auth.getUser();
-        if (authError || !data.user) {
+        const { data, error: authError } = await supabase.auth.getSession();
+        const user = data?.session?.user;
+        if (authError || !user) {
           router.replace("/");
           return;
         }
@@ -38,7 +39,7 @@ export default function RoleGuard({ allowedRole, children }: RoleGuardProps) {
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
           .select("role")
-          .eq("id", data.user.id)
+          .eq("id", user.id)
           .single();
 
         if (profileError) {

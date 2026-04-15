@@ -6,7 +6,7 @@ import InfiniteScroll from "react-infinite-scroll-component";
 
 import { supabase } from "@/lib/supabaseClient";
 import BookSearchResultCard from "@/components/dashboard/user/search/BookSearchResultCard";
-import Dropdown from "@/components/dashboard/user/search/Dropdown";
+import Dropdown from "@/components/common/Dropdown";
 import { filterBooks, getSuggestions, mapBookRow, type SearchFormatFilter } from "@/components/dashboard/user/search/search-utils";
 import type { BookRow, SmartSearchBook } from "@/components/dashboard/user/search/types";
 
@@ -250,7 +250,7 @@ export default function UserSmartSearchSection() {
 
         <div className="mt-5 space-y-3">
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="relative block">
+            <label className="relative block w-full md:max-w-md">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/45" />
               <input
                 ref={inputRef}
@@ -275,7 +275,7 @@ export default function UserSmartSearchSection() {
               ) : null}
             </label>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 w-full md:w-90">
               <Dropdown
                 title="Format"
                 id="format"

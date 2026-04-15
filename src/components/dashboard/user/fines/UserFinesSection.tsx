@@ -161,8 +161,8 @@ export default function UserFinesSection() {
     setError(null);
 
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const resolvedUserId = userData?.user?.id;
+      const { data: userData } = await supabase.auth.getSession();
+      const resolvedUserId = userData?.session?.user?.id;
       if (!resolvedUserId) {
         if (isActive) {
           setError("Not signed in");

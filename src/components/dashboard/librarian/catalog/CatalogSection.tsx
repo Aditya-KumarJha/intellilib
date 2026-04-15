@@ -7,7 +7,7 @@ import { Search, X, Plus, Sparkles, Upload } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
 import LibrarianBookCard from "./LibrarianBookCard";
-import Dropdown from "@/components/dashboard/user/search/Dropdown";
+import Dropdown from "@/components/common/Dropdown";
 import type { SmartSearchBook } from "@/components/dashboard/user/search/types";
 
 type FormatFilter = "all" | "physical" | "digital" | "both";
@@ -197,7 +197,7 @@ export default function CatalogSection() {
       <section className="max-w-6xl rounded-3xl border border-black/10 bg-white/75 p-5 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-white/5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/25 bg-purple-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300">
+            <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/25 bg-purple-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300 mb-6">
               <Sparkles className="h-3.5 w-3.5" />
               Librarian Workspace
             </div>

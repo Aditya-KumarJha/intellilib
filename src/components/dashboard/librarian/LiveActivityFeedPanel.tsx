@@ -1,7 +1,21 @@
-import LibrarianPanelCard from "@/components/dashboard/librarian/LibrarianPanelCard";
-import { liveActivityItems } from "@/components/dashboard/librarian/data";
+import { BookOpenCheck, IndianRupee, RotateCcw, UserPlus } from "lucide-react";
 
-export default function LiveActivityFeedPanel() {
+import LibrarianPanelCard from "@/components/dashboard/librarian/LibrarianPanelCard";
+import type { LibrarianLiveActivityItem } from "@/components/dashboard/librarian/useLibrarianDashboardData";
+
+const iconByType = {
+  issue: BookOpenCheck,
+  return: RotateCcw,
+  payment: IndianRupee,
+  request: UserPlus,
+} as const;
+
+type LiveActivityFeedPanelProps = {
+  items: LibrarianLiveActivityItem[];
+  loading?: boolean;
+};
+
+export default function LiveActivityFeedPanel({ items, loading = false }: LiveActivityFeedPanelProps) {
   return (
     <LibrarianPanelCard
       title="Live Activity Feed"
@@ -10,8 +24,8 @@ export default function LiveActivityFeedPanel() {
       delay={0.1}
     >
       <div className="space-y-2">
-        {liveActivityItems.map((item) => {
-          const Icon = item.icon;
+        {items.map((item) => {
+          const Icon = iconByType[item.type] ?? BookOpenCheck;
           return (
             <article
               key={item.event}
@@ -21,7 +35,7 @@ export default function LiveActivityFeedPanel() {
                 <Icon className="h-4 w-4 text-cyan-600 dark:text-cyan-300" aria-hidden />
                 {item.event}
               </p>
-              <span className="text-xs text-foreground/55">{item.time}</span>
+              <span className="text-xs text-foreground/55">{loading ? "--" : item.time}</span>
             </article>
           );
         })}

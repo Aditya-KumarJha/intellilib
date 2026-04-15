@@ -69,8 +69,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // try to get current user immediately
     (async () => {
       try {
-        const { data } = await supabase.auth.getUser();
-        const authUser = toAuthUser(data?.user);
+        const { data } = await supabase.auth.getSession();
+        const authUser = toAuthUser(data?.session?.user ?? null);
         await hydrateUser(authUser);
       } catch {
         // ignore

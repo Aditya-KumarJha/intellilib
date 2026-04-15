@@ -1,7 +1,16 @@
-import LibrarianPanelCard from "@/components/dashboard/librarian/LibrarianPanelCard";
-import { inventorySnapshot } from "@/components/dashboard/librarian/data";
+import { AlertTriangle, BookCopy, BookMarked, Plus } from "lucide-react";
 
-export default function InventorySnapshotPanel() {
+import LibrarianPanelCard from "@/components/dashboard/librarian/LibrarianPanelCard";
+import type { LibrarianSnapshotItem } from "@/components/dashboard/librarian/useLibrarianDashboardData";
+
+const snapshotIcons = [BookCopy, BookMarked, AlertTriangle, Plus];
+
+type InventorySnapshotPanelProps = {
+  items: LibrarianSnapshotItem[];
+  loading?: boolean;
+};
+
+export default function InventorySnapshotPanel({ items, loading = false }: InventorySnapshotPanelProps) {
   return (
     <LibrarianPanelCard
       title="Inventory Snapshot"
@@ -10,8 +19,8 @@ export default function InventorySnapshotPanel() {
       delay={0.12}
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        {inventorySnapshot.map((item) => {
-          const Icon = item.icon;
+        {items.map((item, idx) => {
+          const Icon = snapshotIcons[idx] ?? BookCopy;
           return (
             <article
               key={item.label}
@@ -21,8 +30,8 @@ export default function InventorySnapshotPanel() {
                 <Icon className="h-4 w-4 text-violet-600 dark:text-violet-300" aria-hidden />
                 {item.label}
               </p>
-              <p className="mt-2 text-lg font-semibold text-foreground">{item.value}</p>
-              <p className="text-xs text-foreground/60">{item.hint}</p>
+              <p className="mt-2 text-lg font-semibold text-foreground">{loading ? "--" : item.value}</p>
+              <p className="text-xs text-foreground/60">{loading ? "Loading inventory data..." : item.hint}</p>
             </article>
           );
         })}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { Info, Search, X, BookOpen } from "lucide-react";
-import Dropdown from "@/components/dashboard/user/search/Dropdown";
+import Dropdown from "@/components/common/Dropdown";
+import PaginationControls from "@/components/common/PaginationControls";
 import { PopulatedReservation } from "@/lib/server/librarianRequests";
 
 export default function RequestsTable({ initialReservations }: { initialReservations: PopulatedReservation[] }) {
@@ -52,6 +53,17 @@ export default function RequestsTable({ initialReservations }: { initialReservat
 
     return result;
   }, [initialReservations, query, statusFilter, sortBy]);
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const perPage = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / perPage));
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter, sortBy, initialReservations]);
+
+  const display = filteredRequests.slice((page - 1) * perPage, page * perPage);
 
   return (
     <div className="space-y-4">
@@ -121,7 +133,7 @@ export default function RequestsTable({ initialReservations }: { initialReservat
             </tr>
           </thead>
           <tbody>
-            {filteredRequests.length === 0 ? (
+            {display.length === 0 ? (
               <tr>
                 <td colSpan={5} className="py-12 text-center text-foreground/50">
                   <div className="flex flex-col items-center justify-center gap-2">
@@ -131,7 +143,7 @@ export default function RequestsTable({ initialReservations }: { initialReservat
                 </td>
               </tr>
             ) : (
-              filteredRequests.map((req) => (
+              display.map((req) => (
                 <tr key={req.id} className="border-b border-black/5 last:border-0 hover:bg-black/5 dark:border-white/5 dark:hover:bg-white/5 transition">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -180,6 +192,15 @@ export default function RequestsTable({ initialReservations }: { initialReservat
             )}
           </tbody>
         </table>
+      </div>
+      <div className="mt-2 flex items-center justify-end">
+        <PaginationControls
+          currentPage={page}
+          totalPages={totalPages}
+          onPrev={() => setPage((p) => Math.max(1, p - 1))}
+          onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+          onJump={(p) => setPage(p)}
+        />
       </div>
     </div>
   );

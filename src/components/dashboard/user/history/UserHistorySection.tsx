@@ -40,8 +40,8 @@ export default function UserHistorySection() {
 
   async function loadHistory(isMounted: () => boolean) {
     setLoading(true);
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData?.user?.id;
+    const { data: userData } = await supabase.auth.getSession();
+    const userId = userData?.session?.user?.id;
     if (!userId) {
       setNotes([]);
       setLoading(false);
@@ -100,8 +100,8 @@ export default function UserHistorySection() {
 
     let channel: ReturnType<typeof supabase.channel> | null = null;
     void (async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
+      const { data: userData } = await supabase.auth.getSession();
+      const userId = userData?.session?.user?.id;
       if (!userId || !mounted) return;
 
       channel = supabase

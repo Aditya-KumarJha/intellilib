@@ -19,7 +19,6 @@ export default async function NotificationsSection() {
       "overdue_review",
       "payment_verified",
       "payment_success",
-      "book_issued",
       "reservation_queue",
     ];
 

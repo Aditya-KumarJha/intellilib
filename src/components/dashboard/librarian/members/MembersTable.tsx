@@ -4,7 +4,8 @@ import { useMemo, useState, useRef, useEffect } from "react";
 import { Info, Search, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { supabase } from "@/lib/supabaseClient";
-import Dropdown from "@/components/dashboard/user/search/Dropdown";
+import Dropdown from "@/components/common/Dropdown";
+import PaginationControls from "@/components/common/PaginationControls";
 import type { Member } from "@/lib/server/members";
 
 type Props = {
@@ -94,6 +95,17 @@ export default function MembersTable({ initialMembers }: Props) {
 
     return result;
   }, [members, query, roleFilter, statusFilter]);
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const perPage = 10;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, roleFilter, statusFilter, members]);
+
+  const display = filtered.slice((page - 1) * perPage, page * perPage);
 
   const toggleStatus = async (id: string, current: string | null) => {
     const next = current === "active" ? "suspended" : "active";
@@ -210,7 +222,7 @@ export default function MembersTable({ initialMembers }: Props) {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {display.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-12 text-center text-foreground/50">
                   <div className="flex flex-col items-center justify-center gap-2">
@@ -220,7 +232,7 @@ export default function MembersTable({ initialMembers }: Props) {
                 </td>
               </tr>
             ) : (
-              filtered.map((m) => {
+              display.map((m) => {
                 const isSelf = currentUserId === m.id;
                 const callerIsAdmin = currentUserRole === "admin";
                 const cannotToggleDueRole = !callerIsAdmin && (m.role === "admin" || m.role === "librarian");
@@ -263,6 +275,16 @@ export default function MembersTable({ initialMembers }: Props) {
           </tbody>
         </table>
       </div>
+      <div className="mt-2 flex items-center justify-end">
+        <PaginationControls
+          currentPage={page}
+          totalPages={totalPages}
+          onPrev={() => setPage((p) => Math.max(1, p - 1))}
+          onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+          onJump={(p) => setPage(p)}
+        />
+      </div>
     </div>
   );
 }
+

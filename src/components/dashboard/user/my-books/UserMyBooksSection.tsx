@@ -130,16 +130,17 @@ export default function UserMyBooksSection() {
     let active = true;
 
     async function bootstrap() {
-      const { data, error: userError } = await supabase.auth.getUser();
+      const { data, error: userError } = await supabase.auth.getSession();
       if (!active) return;
 
-      if (userError || !data.user?.id) {
+      const resolvedId = data?.session?.user?.id;
+      if (userError || !resolvedId) {
         setError(userError?.message || "Could not resolve user session");
         setLoading(false);
         return;
       }
 
-      setCurrentUserId(data.user.id);
+      setCurrentUserId(resolvedId);
     }
 
     void bootstrap();
