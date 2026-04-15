@@ -1,17 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import AuditLogEntry from "./AuditLogEntry";
+import { useState } from "react";
+import AuditLogEntry, { type AuditRow } from "./AuditLogEntry";
 import PaginationControls from "@/components/common/PaginationControls";
 
-export default function AuditLogSectionClient({ initialRows }: { initialRows: any[] }) {
+export default function AuditLogSectionClient({ initialRows }: { initialRows: AuditRow[] }) {
   const [page, setPage] = useState(1);
-  const perPage = 10;
+  const [perPage, setPerPage] = useState(10);
   const totalPages = Math.max(1, Math.ceil((initialRows?.length ?? 0) / perPage));
-
-  useEffect(() => {
-    setPage(1);
-  }, [initialRows]);
 
   const display = (initialRows ?? []).slice((page - 1) * perPage, page * perPage);
 
@@ -33,7 +29,12 @@ export default function AuditLogSectionClient({ initialRows }: { initialRows: an
           totalPages={totalPages}
           onPrev={() => setPage((p) => Math.max(1, p - 1))}
           onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-          onJump={(p) => setPage(p)}
+          onJump={(p: number) => setPage(p)}
+          perPage={perPage}
+          onPerPageChange={(n: number) => {
+            setPerPage(n);
+            setPage(1);
+          }}
         />
       </div>
     </>

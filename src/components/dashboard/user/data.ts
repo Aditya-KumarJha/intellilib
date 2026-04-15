@@ -3,6 +3,7 @@ import {
   AlarmClock,
   ArrowRight,
   Bot,
+  Bookmark,
   BookCheck,
   BookCopy,
   BookMarked,
@@ -124,6 +125,7 @@ export const smartNotifications = [
 export const quickActions = [
   { label: "Search Book", href: "/dashboard/user/search", icon: Search },
   { label: "View My Books", href: "/dashboard/user/my-books", icon: BookOpen },
+  { label: "Bookmarks", href: "/dashboard/user/bookmarks", icon: Bookmark },
   { label: "Pay Fine", href: "/dashboard/user/fines", icon: CreditCard },
   { label: "Ask AI", href: "/dashboard/user/assistant", icon: Sparkles },
 ];

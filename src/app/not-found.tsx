@@ -1,25 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function NotFound() {
-  const [loaded, setLoaded] = useState(false);
   const router = useRouter();
-
-  useEffect(() => {
-    setLoaded(true);
-  }, []);
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center overflow-hidden">
       
       <div
         onClick={() => router.push("/")}
-        className={`cursor-pointer transition-all duration-1000 ease-out ${
-          loaded ? "opacity-100 scale-100" : "opacity-0 scale-95"
-        }`}
+        className="cursor-pointer opacity-100 scale-100 transition-all duration-1000 ease-out"
       >
         <Image
           src="/images/Not-Found.svg"

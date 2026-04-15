@@ -32,7 +32,7 @@ export default function RoleGuard({ allowedRole, children }: RoleGuardProps) {
         const { data, error: authError } = await supabase.auth.getSession();
         const user = data?.session?.user;
         if (authError || !user) {
-          router.replace("/");
+          router.replace("/login");
           return;
         }
 
@@ -52,6 +52,7 @@ export default function RoleGuard({ allowedRole, children }: RoleGuardProps) {
         if (role !== allowedRole) {
           setError(`Access Denied: This dashboard is only accessible to ${allowedRole}s.`);
           setIsAuthorized(false);
+          setIsLoading(false);
 
           setTimeout(() => {
             router.replace(`/dashboard/${role}`);
@@ -61,14 +62,14 @@ export default function RoleGuard({ allowedRole, children }: RoleGuardProps) {
 
         // User is authorized
         setIsAuthorized(true);
-      } catch (error: any) {
+        setIsLoading(false);
+      } catch (error: unknown) {
         console.error("Role verification error:", error);
         setError("Failed to verify access permissions");
-        setTimeout(() => {
-          router.replace("/");
-        }, 3000);
-      } finally {
         setIsLoading(false);
+        setTimeout(() => {
+          router.replace("/login");
+        }, 3000);
       }
     };
 

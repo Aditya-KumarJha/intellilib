@@ -3,31 +3,48 @@
 import React from "react";
 import { format } from "date-fns";
 
-type AuditRow = {
+type AuditMetadata = Record<string, unknown> | string | null;
+
+export type AuditRow = {
   id: string | number;
   action?: string | null;
   entity?: string | null;
   entity_id?: number | null;
   actor?: string | null;
-  metadata?: any;
+  metadata?: AuditMetadata;
   created_at?: string | null;
 };
 
-function prettyMetadata(md: any) {
-  if (!md) return null;
-  if (typeof md === "string") {
+function prettyMetadata(metadata: AuditMetadata): Record<string, unknown> | string | null {
+  if (!metadata) return null;
+  if (typeof metadata === "string") {
     try {
-      return JSON.parse(md);
-    } catch (e) {
-      return md;
+      const parsed = JSON.parse(metadata) as unknown;
+      return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : metadata;
+    } catch {
+      return metadata;
     }
   }
-  return md;
+
+  return metadata;
+}
+
+function metadataActor(metadata: Record<string, unknown> | string | null): string | null {
+  if (!metadata || typeof metadata === "string") {
+    return null;
+  }
+
+  const actor = metadata.actor ?? metadata.user ?? metadata.provider;
+  return typeof actor === "string" ? actor : null;
+}
+
+function metadataDisplay(metadata: Record<string, unknown> | string) {
+  return typeof metadata === "string" ? metadata : JSON.stringify(metadata, null, 2);
 }
 
 export default function AuditLogEntry({ a }: { a: AuditRow }) {
   const meta = prettyMetadata(a.metadata);
-  const actor = a.actor ?? (meta && (meta.actor || meta.user || meta.provider)) ?? "System";
+  const actor = a.actor ?? metadataActor(meta) ?? "System";
 
   return (
     <div className="rounded-lg border border-black/6 bg-white/60 p-3 dark:border-white/6 dark:bg-white/3">
@@ -48,7 +65,7 @@ export default function AuditLogEntry({ a }: { a: AuditRow }) {
 
         {meta ? (
           <pre className="mt-2 max-h-36 overflow-auto rounded-md bg-black/3 p-2 text-xs text-foreground/60 dark:bg-white/3">
-            {typeof meta === "string" ? meta : JSON.stringify(meta, null, 2)}
+            {metadataDisplay(meta)}
           </pre>
         ) : null}
       </div>

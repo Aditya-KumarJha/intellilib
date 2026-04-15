@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition, useEffect } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { AlertCircle, CheckCircle2, RefreshCcw, Search, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
@@ -119,12 +119,8 @@ export default function CirculationDesk({
 
   // Pagination for recentRows
   const [page, setPage] = useState(1);
-  const perPage = 10;
+  const [perPage, setPerPage] = useState(10);
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / perPage));
-
-  useEffect(() => {
-    setPage(1);
-  }, [query, statusFilter, recentRows]);
 
   const display = filteredRows.slice((page - 1) * perPage, page * perPage);
 
@@ -356,7 +352,10 @@ export default function CirculationDesk({
             <input
               ref={searchInputRef}
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(1);
+              }}
               placeholder="Search by member, title, or transaction id"
               className="h-12 w-full rounded-xl border border-black/10 bg-white/70 pl-10 pr-10 text-sm text-foreground outline-none transition focus:border-purple-500/40 focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-white/10"
             />
@@ -366,6 +365,7 @@ export default function CirculationDesk({
                 type="button"
                 onClick={() => {
                   setQuery("");
+                  setPage(1);
                   searchInputRef.current?.focus();
                 }}
                 aria-label="Clear search"
@@ -381,7 +381,10 @@ export default function CirculationDesk({
               title="All status"
               options={statusOptions}
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as "all" | "issued" | "overdue" | "returned")}
+              onChange={(event) => {
+                setStatusFilter(event.target.value as "all" | "issued" | "overdue" | "returned");
+                setPage(1);
+              }}
               id="statusFilter"
               name="statusFilter"
             />
@@ -459,7 +462,12 @@ export default function CirculationDesk({
               totalPages={totalPages}
               onPrev={() => setPage((p) => Math.max(1, p - 1))}
               onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-              onJump={(p) => setPage(p)}
+              onJump={(p: number) => setPage(p)}
+              perPage={perPage}
+              onPerPageChange={(n: number) => {
+                setPerPage(n);
+                setPage(1);
+              }}
             />
           </div>
       </div>

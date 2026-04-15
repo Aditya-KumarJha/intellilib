@@ -4,11 +4,14 @@ import { useMemo, useState } from "react";
 import { BookOpen, Hash, Layers, Library, Link as LinkIcon } from "lucide-react";
 import { toast } from "react-toastify";
 
+import BookmarkToggleButton from "@/components/dashboard/user/bookmarks/BookmarkToggleButton";
 import type { SmartSearchBook } from "@/components/dashboard/user/search/types";
 import { supabase } from "@/lib/supabaseClient";
 
 type BookSearchResultCardProps = {
   book: SmartSearchBook;
+  bookmarked?: boolean;
+  onBookmarkChange?: (nextBookmarked: boolean) => void;
   onActionComplete?: () => void;
 };
 
@@ -18,7 +21,12 @@ function formatTypeLabel(type: SmartSearchBook["type"]) {
   return "Physical";
 }
 
-export default function BookSearchResultCard({ book, onActionComplete }: BookSearchResultCardProps) {
+export default function BookSearchResultCard({
+  book,
+  bookmarked = false,
+  onBookmarkChange,
+  onActionComplete,
+}: BookSearchResultCardProps) {
   const [issuing, setIssuing] = useState(false);
   const [reserving, setReserving] = useState(false);
 
@@ -103,7 +111,15 @@ export default function BookSearchResultCard({ book, onActionComplete }: BookSea
   }
 
   return (
-    <article className="overflow-hidden rounded-3xl border border-black/10 bg-white/70 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+    <article className="relative overflow-hidden rounded-3xl border border-black/10 bg-white/70 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+      <div className="absolute right-4 top-4 z-10">
+        <BookmarkToggleButton
+          bookId={book.id}
+          initialBookmarked={bookmarked}
+          onChange={onBookmarkChange}
+        />
+      </div>
+
       <div className="flex flex-col gap-4 p-4 sm:flex-row sm:p-5">
         <div className="h-40 w-full shrink-0 overflow-hidden rounded-2xl bg-black/5 sm:h-44 sm:w-32 dark:bg-white/10">
           {book.cover_url ? (

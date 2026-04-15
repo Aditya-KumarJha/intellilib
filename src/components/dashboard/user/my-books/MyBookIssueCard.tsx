@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { AlertTriangle, BookOpen, CalendarClock, Library, Link as LinkIcon } from "lucide-react";
 
+import BookmarkToggleButton from "@/components/dashboard/user/bookmarks/BookmarkToggleButton";
 import { formatDate, getDaysLabel, getIssueVisualStatus, formatCurrency } from "@/components/dashboard/user/my-books/my-books-utils";
 import type { MyBookIssue } from "@/components/dashboard/user/my-books/types";
 import { useState } from "react";
@@ -9,6 +10,8 @@ import { toast } from "react-toastify";
 
 type MyBookIssueCardProps = {
   issue: MyBookIssue;
+  bookmarked?: boolean;
+  onBookmarkChange?: (bookId: number, nextBookmarked: boolean) => void;
 };
 
 const statusStyles: Record<"issued" | "returned" | "overdue", string> = {
@@ -20,7 +23,11 @@ const statusStyles: Record<"issued" | "returned" | "overdue", string> = {
     "border-red-400/35 bg-red-500/10 text-red-700 dark:text-red-300",
 };
 
-export default function MyBookIssueCard({ issue }: MyBookIssueCardProps) {
+export default function MyBookIssueCard({
+  issue,
+  bookmarked = false,
+  onBookmarkChange,
+}: MyBookIssueCardProps) {
   const visualStatus = getIssueVisualStatus(issue);
   const [requestingReturn, setRequestingReturn] = useState(false);
   const hasPendingReturnRequest = Boolean(issue.returnRequestPending);
@@ -43,7 +50,15 @@ export default function MyBookIssueCard({ issue }: MyBookIssueCardProps) {
   }
 
   return (
-    <article className="overflow-hidden rounded-3xl border border-black/10 bg-white/70 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+    <article className="relative overflow-hidden rounded-3xl border border-black/10 bg-white/70 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+      <div className="absolute right-4 top-4 z-10">
+        <BookmarkToggleButton
+          bookId={issue.book.id}
+          initialBookmarked={bookmarked}
+          onChange={(nextBookmarked) => onBookmarkChange?.(issue.book.id, nextBookmarked)}
+        />
+      </div>
+
       <div className="flex flex-col gap-4 p-4 sm:flex-row sm:p-5">
         <div className="h-40 w-full shrink-0 overflow-hidden rounded-2xl bg-black/5 sm:h-44 sm:w-32 dark:bg-white/10">
           {issue.book.coverUrl ? (

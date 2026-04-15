@@ -5,6 +5,7 @@ import { Search, Sparkles, X } from "lucide-react";
 import InfiniteScroll from "react-infinite-scroll-component";
 
 import { supabase } from "@/lib/supabaseClient";
+import { useUserBookmarkIds } from "@/components/dashboard/user/bookmarks/useUserBookmarkIds";
 import BookSearchResultCard from "@/components/dashboard/user/search/BookSearchResultCard";
 import Dropdown from "@/components/common/Dropdown";
 import { filterBooks, getSuggestions, mapBookRow, type SearchFormatFilter } from "@/components/dashboard/user/search/search-utils";
@@ -69,10 +70,12 @@ export default function UserSmartSearchSection() {
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [showTop, setShowTop] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const pageRef = useRef(0);
 
   const PAGE_SIZE = 20;
+  const { bookmarkedIdSet, updateLocal: updateLocalBookmarks } = useUserBookmarkIds(currentUserId);
 
   const loadBooks = useCallback(
     async (requestedPage = 0, append = false) => {
@@ -184,6 +187,25 @@ export default function UserSmartSearchSection() {
         setTotalCopiesAvailable(null);
       }
     }, [query, activeFormat]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function bootstrap() {
+      const { data } = await supabase.auth.getSession();
+      if (!active) {
+        return;
+      }
+
+      setCurrentUserId(data.session?.user?.id ?? null);
+    }
+
+    void bootstrap();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     // initial load or when query/format changes
@@ -360,7 +382,13 @@ export default function UserSmartSearchSection() {
         >
           <div className="grid gap-4 lg:grid-cols-2">
             {filtered.map((book) => (
-              <BookSearchResultCard key={book.id} book={book} onActionComplete={refreshAfterAction} />
+              <BookSearchResultCard
+                key={book.id}
+                book={book}
+                bookmarked={bookmarkedIdSet.has(book.id)}
+                onBookmarkChange={(nextBookmarked) => updateLocalBookmarks(book.id, nextBookmarked)}
+                onActionComplete={refreshAfterAction}
+              />
             ))}
           </div>
         </InfiniteScroll>

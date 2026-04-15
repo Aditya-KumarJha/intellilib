@@ -4,12 +4,22 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 
 import useAuthStore from "@/lib/authStore";
 
 export default function DashboardIndexPage() {
   const router = useRouter();
   const { init, isAuthenticated, isRoleLoading, role } = useAuthStore();
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("social_login") === "true") {
+        toast.success("Login successful!");
+      }
+    }
+  }, []);
 
   useQuery({
     queryKey: ["auth", "init"],

@@ -1,6 +1,7 @@
 import supabaseAdmin from "@/lib/supabaseServerClient";
 import { uploadToImageKit } from "./imagekit";
-import { getIssueDurationDays } from "./reservationService";
+import { compactQueuePositions, promoteWaitingReservationsForBook } from "./reservationService";
+import { notifyUserById } from "./libraryNotifications";
 
 export async function resolveCategoryId({ categoryId, categoryName }: { categoryId?: unknown; categoryName?: unknown }) {
   const parsedCategoryId = Number(categoryId);
@@ -158,14 +159,13 @@ export async function adjustBookCopies(bookId: number, delta: number) {
       .maybeSingle();
 
     if (!error && data) {
-      // if increasing and previous available was 0 then try to allocate to reservations
-      if (delta > 0 && Number(current.available_copies ?? 0) === 0) {
+      if (delta > 0) {
         // run queue allocation logic - promote and issue directly, but don't block forever
         try {
-          await allocateCopiesToQueue(bookId);
+          await promoteReservationsAfterCopyIncrease(bookId);
         } catch (e) {
           // best-effort: log and continue
-          console.warn("allocateCopiesToQueue failed", e);
+          console.warn("promoteReservationsAfterCopyIncrease failed", e);
         }
       }
 
@@ -174,8 +174,7 @@ export async function adjustBookCopies(bookId: number, delta: number) {
     // record last error and backoff before retrying
     lastError = error ?? lastError;
     const backoffMs = 50 * (attempt + 1);
-    // small delay
-    // eslint-disable-next-line no-await-in-loop
+    // small delay to reduce write contention between competing copy adjustments
     await new Promise((resolve) => setTimeout(resolve, backoffMs));
   }
   // Fallback: try an unconditional update as a last resort to break contention.
@@ -199,11 +198,11 @@ export async function adjustBookCopies(bookId: number, delta: number) {
       throw new Error("Could not update book copies due to contention");
     }
 
-    if (delta > 0 && Number(current.available_copies ?? 0) === 0) {
+    if (delta > 0) {
       try {
-        await allocateCopiesToQueue(bookId);
+        await promoteReservationsAfterCopyIncrease(bookId);
       } catch (e) {
-        console.warn("allocateCopiesToQueue failed after fallback", e);
+        console.warn("promoteReservationsAfterCopyIncrease failed after fallback", e);
       }
     }
 
@@ -214,72 +213,37 @@ export async function adjustBookCopies(bookId: number, delta: number) {
   }
 }
 
-export async function allocateCopiesToQueue(bookId: number) {
-  const { data: availableCopies } = await supabaseAdmin
-    .from("book_copies")
-    .select("id")
-    .eq("book_id", bookId)
-    .eq("status", "available")
-    .order("id", { ascending: true })
-    .limit(50);
+async function promoteReservationsAfterCopyIncrease(bookId: number) {
+  const promoted = await promoteWaitingReservationsForBook(bookId);
+  if (promoted.length === 0) {
+    return { approved: 0 };
+  }
 
-  const availIds = (availableCopies ?? []).map((r: { id: number }) => r.id);
-  if (availIds.length === 0) return { issued: 0 };
+  const { data: book } = await supabaseAdmin
+    .from("books")
+    .select("title")
+    .eq("id", bookId)
+    .maybeSingle();
 
-  // get waiting reservations
-  const { data: waiting } = await supabaseAdmin
-    .from("reservations")
-    .select("id,user_id,queue_position")
-    .eq("book_id", bookId)
-    .eq("status", "waiting")
-    .order("queue_position", { ascending: true })
-    .limit(availIds.length);
+  const title = String(book?.title ?? "your reserved book");
 
-  if (!waiting || waiting.length === 0) return { issued: 0 };
-
-  const now = new Date().toISOString();
-  const issueDays = await getIssueDurationDays();
-  const dueDate = new Date(Date.now() + issueDays * 24 * 60 * 60 * 1000).toISOString();
-
-  let issued = 0;
-
-  const pairs = Math.min(availIds.length, waiting.length);
-  const ops: Array<Promise<unknown>> = [];
-  for (let i = 0; i < pairs; i += 1) {
-    const copyId = availIds[i];
-    const reservation = waiting[i];
-
-    const updateCopy = supabaseAdmin.from("book_copies").update({ status: "issued", issued_to: reservation.user_id }).eq("id", copyId);
-    const insertTxn = supabaseAdmin.from("transactions").insert({
-      user_id: reservation.user_id,
-      book_copy_id: copyId,
-      issue_date: now,
-      due_date: dueDate,
-      status: "issued",
+  for (const reservation of promoted) {
+    const approvedAt = reservation.approvedAt ? new Date(reservation.approvedAt) : new Date();
+    const holdUntil = new Date(approvedAt.getTime() + 24 * 60 * 60 * 1000).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      dateStyle: "medium",
+      timeStyle: "short",
     });
-    const completeRes = supabaseAdmin.from("reservations").update({ status: "completed", queue_position: null }).eq("id", reservation.id);
 
-    // run these three in parallel per pair
-    ops.push(Promise.all([updateCopy, insertTxn, completeRes]));
-    issued += 1;
+    await notifyUserById(reservation.userId, {
+      inAppMessage: `${title} is now available. Collect before ${holdUntil} with your ID card.`,
+      subject: "IntelliLib: Reserved Book Available",
+      text: `${title} is now available. Please collect it before ${holdUntil} with your ID card.`,
+      html: `<p><strong>${title}</strong> is now available.</p><p>Please collect it before <strong>${holdUntil}</strong> with your ID card.</p>`,
+    });
   }
 
-  // execute all pair operations in parallel to reduce latency
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    await Promise.all(ops);
-  } catch (e) {
-    console.warn("Error while issuing copies in parallel", e);
-  }
+  await compactQueuePositions(bookId);
 
-  // adjust book counts via RPC; wrap in try/catch because PostgREST RPC builder
-  // does not expose a .catch on its return type in TypeScript
-  try {
-    await supabaseAdmin.rpc("update_book_counts");
-  } catch (e) {
-    // best-effort: log and continue
-    console.warn("update_book_counts RPC failed", e);
-  }
-
-  return { issued };
+  return { approved: promoted.length };
 }

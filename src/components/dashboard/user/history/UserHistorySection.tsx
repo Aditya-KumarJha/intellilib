@@ -96,7 +96,9 @@ export default function UserHistorySection() {
   useEffect(() => {
     let mounted = true;
 
-    void loadHistory(() => mounted);
+    const initialLoad = setTimeout(() => {
+      void loadHistory(() => mounted);
+    }, 0);
 
     let channel: ReturnType<typeof supabase.channel> | null = null;
     void (async () => {
@@ -135,6 +137,7 @@ export default function UserHistorySection() {
 
     return () => {
       mounted = false;
+      clearTimeout(initialLoad);
       if (channel) void supabase.removeChannel(channel);
     };
   }, []);

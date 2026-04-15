@@ -120,7 +120,7 @@ export async function POST(req: Request) {
       } else if (Array.isArray(staff) && staff.length > 0) {
         const inserts = (staff as StaffProfile[]).map((staffUser) => ({
           user_id: staffUser.id,
-          type: "return_request",
+          type: "reservation_update",
           message,
           is_read: false,
           target_role: "librarian",
@@ -134,23 +134,29 @@ export async function POST(req: Request) {
 
         try {
           await insertNotificationRows(inserts);
-        } catch (notifErr: any) {
+        } catch (notifErr: unknown) {
           await logAuditEvent({
             userId: user.id,
             action: "return_request_notify_staff_failed",
             entity: "return_request",
             entityId: null,
-            metadata: { transactionId: txId, error: notifErr?.message ?? String(notifErr) },
+            metadata: {
+              transactionId: txId,
+              error: notifErr instanceof Error ? notifErr.message : String(notifErr),
+            },
           });
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       await logAuditEvent({
         userId: user.id,
         action: "return_request_notify_staff_failed",
         entity: "return_request",
         entityId: null,
-        metadata: { transactionId: txId, error: err?.message ?? String(err) },
+        metadata: {
+          transactionId: txId,
+          error: err instanceof Error ? err.message : String(err),
+        },
       });
     }
 
@@ -162,13 +168,16 @@ export async function POST(req: Request) {
         text: `Return requested for ${bookTitle}. A librarian will process it shortly.`,
         html: `<p>Return requested for <strong>${bookTitle}</strong>. A librarian will process it shortly.</p>`,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       await logAuditEvent({
         userId: user.id,
         action: "return_request_notify_user_failed",
         entity: "return_request",
         entityId: null,
-        metadata: { transactionId: txId, error: err?.message ?? String(err) },
+        metadata: {
+          transactionId: txId,
+          error: err instanceof Error ? err.message : String(err),
+        },
       });
     }
 

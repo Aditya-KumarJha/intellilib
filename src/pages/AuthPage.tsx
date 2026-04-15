@@ -25,7 +25,7 @@ const AuthPage = ({ initialMode = "login" }: AuthPageProps) => {
 
   const handleOtpVerified = () => {
     setOtpStep(false);
-    router.push("/");
+    router.push("/dashboard");
   };
 
   return (

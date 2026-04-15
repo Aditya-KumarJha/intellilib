@@ -303,7 +303,7 @@ const AiSmartDiscovery = () => {
                   <div className="pointer-events-none absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,var(--ai-search-glow),transparent_70%)] opacity-0 transition duration-300 group-focus-within/search:opacity-100" />
                   <div className="relative flex items-center gap-4 rounded-full border border-(--ai-panel-border) bg-(--ai-panel-bg) px-5 py-2 text-sm text-(--ai-input-text) transition duration-300 group-focus-within/search:scale-[1.02] group-focus-within/search:border-(--search-accent)">
                     <Search className="h-4 w-4 text-(--ai-icon-muted)" />
-                    Search "neural networks"...
+                    Search &quot;neural networks&quot;...
                   </div>
                 </div>
 

@@ -1,6 +1,6 @@
 import { notifyUserById } from "@/lib/server/libraryNotifications";
 import { hasRecentNotification } from "@/lib/server/libraryNotifications";
-import { compactQueuePositions, getApprovedReservationCount, getPhysicalAvailableCopyIds } from "@/lib/server/reservationService";
+import { compactQueuePositions, promoteWaitingReservationsForBook } from "@/lib/server/reservationService";
 import supabaseAdmin from "@/lib/supabaseServerClient";
 
 const HOLD_HOURS = 24;
@@ -127,34 +127,15 @@ async function approveQueuesForAvailableBooks() {
   let approvedCount = 0;
 
   for (const book of books) {
-    const availableCopyIds = await getPhysicalAvailableCopyIds(book.id);
-    if (availableCopyIds.length === 0) continue;
-    const approvedReservationsCount = await getApprovedReservationCount(book.id);
-    const promotableSlots = Math.max(0, availableCopyIds.length - approvedReservationsCount);
-    if (promotableSlots === 0) continue;
+    const promoted = await promoteWaitingReservationsForBook(book.id);
+    if (promoted.length === 0) continue;
 
-    const { data: waitingRows } = await supabaseAdmin
-      .from("reservations")
-      .select("id,user_id,queue_position")
-      .eq("book_id", book.id)
-      .eq("status", "waiting")
-      .order("queue_position", { ascending: true })
-      .order("created_at", { ascending: true })
-      .limit(promotableSlots);
-
-    if (!waitingRows || waitingRows.length === 0) continue;
-
-    const now = new Date();
-    const holdUntil = addHours(now, HOLD_HOURS).toISOString();
+    const holdBase = promoted[0]?.approvedAt ? new Date(promoted[0].approvedAt) : new Date();
+    const holdUntil = addHours(holdBase, HOLD_HOURS).toISOString();
     const holdUntilText = formatHoldDeadline(holdUntil);
 
-    for (const reservation of waitingRows) {
-      await supabaseAdmin
-        .from("reservations")
-        .update({ status: "approved", created_at: now.toISOString() })
-        .eq("id", reservation.id);
-
-      await notifyUserById(reservation.user_id, {
+    for (const reservation of promoted) {
+      await notifyUserById(reservation.userId, {
         inAppMessage: `${book.title} is now available. Collect before ${holdUntilText} with your ID card.`,
         subject: "IntelliLib: Reserved Book Available",
         text: `Good news. ${book.title} is available now. Please collect it from the counter by ${holdUntilText} with your ID card.`,

@@ -63,6 +63,11 @@ export default async function UserDashboardSectionPage({ params }: PageProps) {
     return <Component />;
   }
 
+  if (section === "bookmarks") {
+    const Component = (await import("@/components/dashboard/user/bookmarks/UserBookmarksSection")).default;
+    return <Component />;
+  }
+
   if (section === "fines") {
     const Component = (await import("@/components/dashboard/user/fines/UserFinesSection")).default;
     return <Component />;

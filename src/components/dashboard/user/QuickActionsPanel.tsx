@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { BookOpen, CreditCard, Search, Sparkles } from "lucide-react";
+import { BookOpen, Bookmark, CreditCard, Search, Sparkles } from "lucide-react";
 
 import UserPanelCard from "@/components/dashboard/user/UserPanelCard";
 import { supabase } from "@/lib/supabaseClient";
@@ -54,6 +54,7 @@ export default function QuickActionsPanel() {
     () => [
       { label: "Search Book", href: "/dashboard/user/search", icon: Search },
       { label: `View My Books (${counts.activeBooks})`, href: "/dashboard/user/my-books", icon: BookOpen },
+      { label: "Bookmarks", href: "/dashboard/user/bookmarks", icon: Bookmark },
       { label: `Pay Fine (${counts.unpaidFines})`, href: "/dashboard/user/fines", icon: CreditCard },
       { label: "Ask AI", href: "/dashboard/user/assistant", icon: Sparkles },
     ],

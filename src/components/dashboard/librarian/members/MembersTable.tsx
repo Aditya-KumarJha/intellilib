@@ -98,12 +98,12 @@ export default function MembersTable({ initialMembers }: Props) {
 
   // Pagination
   const [page, setPage] = useState(1);
-  const perPage = 10;
+  const [perPage, setPerPage] = useState(10);
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
 
   useEffect(() => {
     setPage(1);
-  }, [query, roleFilter, statusFilter, members]);
+  }, [query, roleFilter, statusFilter, members, perPage]);
 
   const display = filtered.slice((page - 1) * perPage, page * perPage);
 
@@ -281,7 +281,12 @@ export default function MembersTable({ initialMembers }: Props) {
           totalPages={totalPages}
           onPrev={() => setPage((p) => Math.max(1, p - 1))}
           onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-          onJump={(p) => setPage(p)}
+          onJump={(p: number) => setPage(p)}
+          perPage={perPage}
+          onPerPageChange={(n: number) => {
+            setPerPage(n);
+            setPage(1);
+          }}
         />
       </div>
     </div>

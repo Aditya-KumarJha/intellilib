@@ -54,11 +54,6 @@ export default async function LibrarianDashboardSectionPage({ params }: PageProp
     notFound();
   }
 
-  if (safeSection === "notifications") {
-    const Component = (await import("@/components/dashboard/librarian/notifications/NotificationsSection")).default;
-    return <Component />;
-  }
-
   if (safeSection === "members") {
     const Component = (await import("@/components/dashboard/librarian/members/MembersPage")).default;
     return <Component />;
@@ -66,6 +61,11 @@ export default async function LibrarianDashboardSectionPage({ params }: PageProp
 
   if (safeSection === "catalog") {
     const Component = (await import("@/components/dashboard/librarian/catalog/CatalogSection")).default;
+    return <Component />;
+  }
+
+  if (safeSection === "assistant") {
+    const Component = (await import("@/components/dashboard/librarian/assistant/LibrarianAssistantSection")).default;
     return <Component />;
   }
 

@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import PaginationControls from "@/components/common/PaginationControls";
+import type { AwaitedReturn } from "@/types/shared";
+import type { getRecentTransactions } from "@/lib/server/adminAnalytics";
 
 function shortDate(d?: string | null) {
   if (!d) return "-";
@@ -16,14 +18,12 @@ function shortDate(d?: string | null) {
   }
 }
 
-export default function LiveActivityPanelClient({ initialTx }: { initialTx: any[] }) {
-  const [page, setPage] = useState(1);
-  const perPage = 10;
-  const totalPages = Math.max(1, Math.ceil((initialTx?.length ?? 0) / perPage));
+type RecentTransactionRow = AwaitedReturn<typeof getRecentTransactions>[number];
 
-  useEffect(() => {
-    setPage(1);
-  }, [initialTx]);
+export default function LiveActivityPanelClient({ initialTx }: { initialTx: RecentTransactionRow[] }) {
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const totalPages = Math.max(1, Math.ceil((initialTx?.length ?? 0) / perPage));
 
   const display = (initialTx ?? []).slice((page - 1) * perPage, page * perPage);
 
@@ -42,21 +42,21 @@ export default function LiveActivityPanelClient({ initialTx }: { initialTx: any[
             </tr>
           </thead>
           <tbody>
-            {display.map((t: any) => (
+            {display.map((transaction) => (
               <tr key={t.id} className="border-t border-black/5 dark:border-white/5">
-                <td className="px-4 py-3">{shortDate(t.created_at)}</td>
-                <td className="px-4 py-3">{t.id}</td>
+                <td className="px-4 py-3">{shortDate(transaction.created_at)}</td>
+                <td className="px-4 py-3">{transaction.id}</td>
                 <td className="px-4 py-3 wrap-break-word max-w-xs">
                   <div className="flex items-center gap-2">
-                    {t.user_avatar ? (
+                    {transaction.user_avatar ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={t.user_avatar} alt="avatar" className="h-6 w-6 rounded-full" />
+                      <img src={transaction.user_avatar} alt="avatar" className="h-6 w-6 rounded-full" />
                     ) : null}
-                    <span>{t.user_display_name ?? t.user_id}</span>
+                    <span>{transaction.user_display_name ?? transaction.user_id}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3">{t.book_title ?? `copy:${t.book_copy_id}`}</td>
-                <td className="px-4 py-3">{String(t.status)}</td>
+                <td className="px-4 py-3">{transaction.book_title ?? `copy:${transaction.book_copy_id}`}</td>
+                <td className="px-4 py-3">{String(transaction.status)}</td>
               </tr>
             ))}
           </tbody>
@@ -69,7 +69,12 @@ export default function LiveActivityPanelClient({ initialTx }: { initialTx: any[
           totalPages={totalPages}
           onPrev={() => setPage((p) => Math.max(1, p - 1))}
           onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-          onJump={(p) => setPage(p)}
+          perPage={perPage}
+          onJump={(p: number) => setPage(p)}
+          onPerPageChange={(n: number) => {
+            setPerPage(n);
+            setPage(1);
+          }}
         />
       </div>
     </>

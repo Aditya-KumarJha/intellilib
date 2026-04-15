@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, RefreshCcw } from "lucide-react";
 
 import InfiniteScroll from "react-infinite-scroll-component";
+import { useUserBookmarkIds } from "@/components/dashboard/user/bookmarks/useUserBookmarkIds";
 import MyBookIssueCard from "@/components/dashboard/user/my-books/MyBookIssueCard";
 import MyBooksStatsRow from "@/components/dashboard/user/my-books/MyBooksStatsRow";
 import { buildMyBooksStats, mapMyBookIssueRow } from "@/components/dashboard/user/my-books/my-books-utils";
@@ -29,6 +30,7 @@ export default function UserMyBooksSection() {
     { activeCount: number; overdueCount: number; returnedCount: number; dueFineAmount: number } | null
   >(null);
   const PAGE_SIZE = 12;
+  const { bookmarkedIdSet, updateLocal: updateLocalBookmarks } = useUserBookmarkIds(currentUserId);
 
   const loadMyBooks = useCallback(
     async (requestedPage = 0, append = false) => {
@@ -362,7 +364,12 @@ export default function UserMyBooksSection() {
         >
           <div className="grid gap-4 lg:grid-cols-2">
             {issues.map((issue) => (
-              <MyBookIssueCard key={issue.id} issue={issue} />
+              <MyBookIssueCard
+                key={issue.id}
+                issue={issue}
+                bookmarked={bookmarkedIdSet.has(issue.book.id)}
+                onBookmarkChange={updateLocalBookmarks}
+              />
             ))}
           </div>
         </InfiniteScroll>

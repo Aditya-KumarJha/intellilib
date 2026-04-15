@@ -128,11 +128,14 @@ export default function SignupForm({
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider.toLowerCase() as "google" | "github",
+        options: {
+          redirectTo: `${window.location.origin}/dashboard?social_login=true`
+        }
       });
       if (error) {
         throw error;
       }
-      // No toast on OAuth start; show success after redirect if needed.
+      toast.success(`Redirecting to ${provider} for signup...`);
     } catch (err: unknown) {
       const msg = getErrorMessage(err, `${provider} signup failed.`);
       setServerError(msg);

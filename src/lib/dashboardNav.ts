@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
   Bell,
+  Bookmark,
   BookMarked,
   BookOpen,
   ClipboardList,
@@ -54,6 +55,12 @@ const userItems: DashboardNavItem[] = [
     icon: BookOpen,
   },
   {
+    segment: "bookmarks",
+    label: "Bookmarks",
+    description: "Saved titles you want to revisit quickly.",
+    icon: Bookmark,
+  },
+  {
     segment: "reservations",
     label: "Reservations",
     description: "Reserve unavailable titles and track queue position.",
@@ -85,6 +92,12 @@ const librarianItems: DashboardNavItem[] = [
     label: "Overview",
     description: "Circulation pulse, requests, and desk shortcuts.",
     icon: LayoutDashboard,
+  },
+  {
+    segment: "assistant",
+    label: "AI Assistant",
+    description: "Talk to the librarian assistant to manage inventory and requests.",
+    icon: MessageSquare,
   },
   {
     segment: "catalog",
@@ -121,12 +134,6 @@ const librarianItems: DashboardNavItem[] = [
     label: "Audit Log",
     description: "Immutable trail of issues, returns, and edits.",
     icon: Shield,
-  },
-  {
-    segment: "notifications",
-    label: "Notifications",
-    description: "Broadcast and operational alerts.",
-    icon: Bell,
   },
 ];
 

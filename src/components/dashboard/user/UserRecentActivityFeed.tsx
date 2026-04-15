@@ -12,6 +12,7 @@ function pickOne<T>(value: T | T[] | null | undefined): T | null {
 }
 
 type ActivityItem = {
+  id: string;
   actor: string;
   action: string;
   time: string;
@@ -71,8 +72,9 @@ export default function UserRecentActivityFeed() {
         const stamp = (returned ? tx.return_date : tx.issue_date) ?? tx.issue_date ?? new Date().toISOString();
 
         return {
+          id: tx.id,
           actor: "You",
-          action: returned ? `returned \"${bookTitle ?? "book"}\"` : `issued \"${bookTitle ?? "book"}\"`,
+          action: returned ? `returned "${bookTitle ?? "book"}"` : `issued "${bookTitle ?? "book"}"`,
           time: relativeTime(stamp),
           icon: returned ? ArrowRight : BookCopy,
           sortAt: new Date(stamp).getTime(),
@@ -80,6 +82,7 @@ export default function UserRecentActivityFeed() {
       });
 
       const paymentItems: Array<ActivityItem & { sortAt: number }> = (payRes.data ?? []).map((pay) => ({
+        id: pay.id,
         actor: "You",
         action: `paid INR ${Math.round(Number(pay.amount ?? 0))} fine`,
         time: relativeTime(pay.created_at),
@@ -91,8 +94,9 @@ export default function UserRecentActivityFeed() {
         const book = pickOne(reservation.books);
         const title = book?.title;
         return {
+          id: reservation.id,
           actor: "You",
-          action: `reserved \"${title ?? "book"}\"`,
+          action: `reserved "${title ?? "book"}"`,
           time: relativeTime(reservation.created_at),
           icon: BookMarked,
           sortAt: new Date(reservation.created_at).getTime(),
@@ -130,7 +134,7 @@ export default function UserRecentActivityFeed() {
           const Icon = item.icon;
           return (
             <article
-              key={`${item.time}-${item.action}`}
+              key={item.id}
               className="rounded-2xl border border-black/10 bg-white/60 p-3 dark:border-white/10 dark:bg-white/5"
             >
               <div className="flex items-start gap-3">
