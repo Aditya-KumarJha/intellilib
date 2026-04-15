@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import Image from "next/image";
 
 const images = [
@@ -18,12 +19,12 @@ const images = [
 export default function HeroSlider() {
   return (
     <div className="banner">
-      <div className="slider" style={{ ["--quantity" as any]: images.length }}>
+      <div className="slider" style={{ "--quantity": images.length } as CSSProperties}>
         {images.map((src, index) => (
           <div
             key={index}
             className="item"
-            style={{ ["--position" as any]: index + 1, position: "absolute" }}
+            style={{ "--position": index + 1, position: "absolute" } as CSSProperties}
           >
             <Image
               src={src}

@@ -280,7 +280,7 @@ function AuthButtons({ scrolledTextClass, scrolled }: { scrolledTextClass: strin
           icon={<LogIn size={16} />}
           textColor="text-white"
           bgColor="bg-linear-to-b from-teal-400 to-cyan-500"
-          onClick={handleLogout as any}
+          onClick={handleLogout}
         />
       </div>
     );
@@ -347,7 +347,7 @@ function MobileAuthButtons({ onClickAction }: { onClickAction: () => void }) {
               icon={<LogIn size={16} />}
               textColor="text-white"
               bgColor="bg-linear-to-b from-teal-400 to-cyan-500"
-              onClick={handleLogout as any}
+              onClick={handleLogout}
             />
           </div>
         </>

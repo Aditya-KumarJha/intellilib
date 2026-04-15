@@ -1,5 +1,11 @@
 const IMAGEKIT_UPLOAD_URL = "https://upload.imagekit.io/api/v1/files/upload";
 
+type ImageKitUploadResponse = {
+  url?: string;
+  filePath?: string;
+  thumbnail?: string;
+};
+
 function basicAuthHeader(secret: string) {
   const token = Buffer.from(`${secret}:`).toString("base64");
   return `Basic ${token}`;
@@ -19,8 +25,8 @@ export async function uploadToImageKit({ fileBuffer, fileName }: { fileBuffer: B
     method: "POST",
     headers: {
       Authorization: basicAuthHeader(privateKey),
-    } as any,
-    body: form as any,
+    },
+    body: form,
   });
 
   if (!res.ok) {
@@ -28,6 +34,6 @@ export async function uploadToImageKit({ fileBuffer, fileName }: { fileBuffer: B
     throw new Error(`ImageKit upload failed: ${res.status} ${text}`);
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as ImageKitUploadResponse;
   return data.url || data.filePath || data.thumbnail || data;
 }

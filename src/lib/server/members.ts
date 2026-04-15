@@ -1,6 +1,22 @@
 import supabaseAdmin from "@/lib/supabaseServerClient";
 import { supabase as supabaseAnon } from "@/lib/supabaseClient";
 
+type ProfileRow = {
+  id: string;
+  full_name: string | null;
+  role: string | null;
+  status: string | null;
+  created_at: string | null;
+  avatar_url: string | null;
+};
+
+type AdminUserLookup = {
+  id: string;
+  email: string | null;
+  last_sign_in: string | null;
+  error?: unknown;
+};
+
 export type Member = {
   id: string;
   name: string | null;
@@ -14,7 +30,7 @@ export type Member = {
 
 export async function getMembers(): Promise<Member[]> {
   try {
-    let res: { data: any[] | null; error: any } = { data: null, error: null };
+    let res: { data: ProfileRow[] | null; error: unknown } = { data: null, error: null };
     const usingService = Boolean(process.env.NEXT_SUPABASE_SERVICE_ROLE_KEY);
 
     // silent fetch, no debug logs
@@ -36,9 +52,9 @@ export async function getMembers(): Promise<Member[]> {
     const lastSignInMap: Record<string, string | null> = {};
 
     if (usingService && rows.length > 0) {
-      const ids = rows.map((r: any) => r.id).filter(Boolean);
+      const ids = rows.map((row) => row.id).filter(Boolean);
       if (ids.length) {
-        const results = await Promise.all(
+        const results: AdminUserLookup[] = await Promise.all(
           ids.map(async (uid: string) => {
             try {
               const { data, error } = await supabaseAdmin.auth.admin.getUserById(uid);
@@ -46,39 +62,39 @@ export async function getMembers(): Promise<Member[]> {
               const email = data?.user?.email ?? null;
               const lastSignIn = data?.user?.last_sign_in_at ?? null;
               return { id: uid, email, last_sign_in: lastSignIn };
-            } catch (err) {
-              return { id: uid, email: null, last_sign_in: null, error: err };
+            } catch (error: unknown) {
+              return { id: uid, email: null, last_sign_in: null, error };
             }
           })
         );
 
-        for (const r of results) {
-          if ((r as any).error) continue;
-          emailMap[String(r.id)] = (r as any).email ?? null;
-          lastSignInMap[String(r.id)] = (r as any).last_sign_in ?? null;
+        for (const result of results) {
+          if (result.error) continue;
+          emailMap[result.id] = result.email ?? null;
+          lastSignInMap[result.id] = result.last_sign_in ?? null;
         }
       }
     }
 
-    return (rows as any[]).map((r) => ({
-      id: String(r.id),
-      name: r.full_name ?? null,
-      email: emailMap[String(r.id)] ?? null,
-      role: r.role ?? null,
-      status: (r.status as string) ?? null,
-      joinedAt: r.created_at ?? null,
-      avatar: r.avatar_url ?? null,
-      lastSignIn: lastSignInMap[String(r.id)] ?? null,
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.full_name ?? null,
+      email: emailMap[row.id] ?? null,
+      role: row.role ?? null,
+      status: row.status ?? null,
+      joinedAt: row.created_at ?? null,
+      avatar: row.avatar_url ?? null,
+      lastSignIn: lastSignInMap[row.id] ?? null,
     }));
-  } catch (e) {
+  } catch {
     return [];
   }
 }
 
 export type MembersDebug = {
-  rows: any[];
+  rows: ProfileRow[];
   emailMap: Record<string, string | null>;
-  errors?: any[];
+  errors?: unknown[];
 };
 
 export async function getMembersDebug(): Promise<MembersDebug> {
@@ -99,29 +115,32 @@ export async function getMembersDebug(): Promise<MembersDebug> {
     debug.rows = rows;
 
     if (usingService && rows.length > 0) {
-      const ids = rows.map((r: any) => r.id).filter(Boolean);
-      const results = await Promise.all(
+      const ids = rows.map((row) => row.id).filter(Boolean);
+      const results: AdminUserLookup[] = await Promise.all(
         ids.map(async (uid: string) => {
           try {
             const { data, error } = await supabaseAdmin.auth.admin.getUserById(uid);
-            if (error) return { id: uid, email: null, error };
+            if (error) return { id: uid, email: null, last_sign_in: null, error };
             const email = data?.user?.email ?? null;
-            return { id: uid, email };
-          } catch (err) {
-            return { id: uid, email: null, error: err };
+            const lastSignIn = data?.user?.last_sign_in_at ?? null;
+            return { id: uid, email, last_sign_in: lastSignIn };
+          } catch (error: unknown) {
+            return { id: uid, email: null, last_sign_in: null, error };
           }
         })
       );
 
-      for (const r of results) {
-        if ((r as any).error) debug.errors?.push({ id: r.id, error: (r as any).error });
-        debug.emailMap[String(r.id)] = (r as any).email ?? null;
+      for (const result of results) {
+        if (result.error) {
+          debug.errors?.push({ id: result.id, error: result.error });
+        }
+        debug.emailMap[result.id] = result.email ?? null;
       }
     }
 
     return debug;
-  } catch (e) {
-    debug.errors?.push(e);
+  } catch (error: unknown) {
+    debug.errors?.push(error);
     return debug;
   }
 }

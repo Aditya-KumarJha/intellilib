@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import PaginationControls from "@/components/common/PaginationControls";
-import type { AwaitedReturn } from "@/types/shared";
 import type { getRecentTransactions } from "@/lib/server/adminAnalytics";
 
 function shortDate(d?: string | null) {
@@ -18,7 +17,7 @@ function shortDate(d?: string | null) {
   }
 }
 
-type RecentTransactionRow = AwaitedReturn<typeof getRecentTransactions>[number];
+type RecentTransactionRow = Awaited<ReturnType<typeof getRecentTransactions>>[number];
 
 export default function LiveActivityPanelClient({ initialTx }: { initialTx: RecentTransactionRow[] }) {
   const [page, setPage] = useState(1);
@@ -43,7 +42,7 @@ export default function LiveActivityPanelClient({ initialTx }: { initialTx: Rece
           </thead>
           <tbody>
             {display.map((transaction) => (
-              <tr key={t.id} className="border-t border-black/5 dark:border-white/5">
+              <tr key={transaction.id} className="border-t border-black/5 dark:border-white/5">
                 <td className="px-4 py-3">{shortDate(transaction.created_at)}</td>
                 <td className="px-4 py-3">{transaction.id}</td>
                 <td className="px-4 py-3 wrap-break-word max-w-xs">

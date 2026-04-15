@@ -1,5 +1,25 @@
 import supabaseAdmin from "@/lib/supabaseServerClient";
 
+type ReservationRow = {
+  id: number;
+  user_id: string;
+  book_id: number;
+  status: string;
+  queue_position: number | null;
+  created_at: string;
+};
+
+type ProfileRow = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+};
+
+type BookRow = {
+  id: number;
+  title: string | null;
+};
+
 export type PopulatedReservation = {
   id: number;
   user_id: string;
@@ -21,8 +41,9 @@ export async function getPendingReservations(): Promise<PopulatedReservation[]> 
 
   if (resErr || !resData) return [];
 
-  const userIds = Array.from(new Set(resData.map((r: any) => r.user_id).filter(Boolean)));
-  const bookIds = Array.from(new Set(resData.map((r: any) => r.book_id).filter(Boolean)));
+  const reservations = resData as ReservationRow[];
+  const userIds = Array.from(new Set(reservations.map((reservation) => reservation.user_id).filter(Boolean)));
+  const bookIds = Array.from(new Set(reservations.map((reservation) => reservation.book_id).filter(Boolean)));
 
   const [{ data: profiles }, { data: books }] = await Promise.all([
     userIds.length
@@ -33,14 +54,14 @@ export async function getPendingReservations(): Promise<PopulatedReservation[]> 
       : Promise.resolve({ data: [] }),
   ]);
 
-  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]));
-  const bookMap = new Map((books ?? []).map((b: any) => [b.id, b]));
+  const profileMap = new Map(((profiles ?? []) as ProfileRow[]).map((profile) => [profile.id, profile]));
+  const bookMap = new Map(((books ?? []) as BookRow[]).map((book) => [book.id, book]));
 
-  return resData.map((r: any) => {
-    const profile = profileMap.get(r.user_id) || null;
-    const book = bookMap.get(r.book_id) || null;
+  return reservations.map((reservation) => {
+    const profile = profileMap.get(reservation.user_id) ?? null;
+    const book = bookMap.get(reservation.book_id) ?? null;
     return {
-      ...r,
+      ...reservation,
       user_display_name: profile?.full_name ?? null,
       user_avatar: profile?.avatar_url ?? null,
       book_title: book?.title ?? null,
