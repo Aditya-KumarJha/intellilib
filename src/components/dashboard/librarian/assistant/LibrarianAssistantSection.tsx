@@ -132,6 +132,11 @@ export default function LibrarianAssistantSection() {
         "I am the Librarian Assistant. You can manage inventory, view pending returns, process returns, and suspend/activate members.",
     },
   ]);
+  const [currentUser, setCurrentUser] = useState<{
+    id?: string;
+    full_name?: string | null;
+    avatar_url?: string | null;
+  } | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [choices, setChoices] = useState<AssistantChoices | null>(null);
@@ -145,6 +150,36 @@ export default function LibrarianAssistantSection() {
       behavior: "smooth",
     });
   }, [messages, sending]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const sessionUser = data.session?.user;
+        if (!sessionUser) return;
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, avatar_url")
+          .eq("id", sessionUser.id)
+          .maybeSingle();
+
+        if (!mounted) return;
+        setCurrentUser({
+          id: sessionUser.id,
+          full_name: profile?.full_name ?? (sessionUser.user_metadata as any)?.full_name ?? null,
+          avatar_url: profile?.avatar_url ?? (sessionUser.user_metadata as any)?.avatar_url ?? null,
+        });
+      } catch (err) {
+        // ignore
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const canSend = useMemo(() => input.trim().length > 0 && !sending, [input, sending]);
 
@@ -258,19 +293,50 @@ export default function LibrarianAssistantSection() {
 
         <div className="mt-5 rounded-2xl border border-black/10 bg-white/75 p-3 dark:border-white/10 dark:bg-black/20">
           <div ref={messagesContainerRef} className="max-h-105 space-y-3 overflow-y-auto px-1 py-1">
-            {messages.map((message, index) => (
-              <div key={`${message.role}-${index}`} className={`flex ${message.role === "librarian" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                    message.role === "librarian"
-                      ? "bg-amber-600 text-white"
-                      : "border border-black/10 bg-white text-foreground dark:border-white/10 dark:bg-white/10"
-                  }`}
-                >
-                  {message.role === "assistant" ? renderAssistantContent(message.content) : message.content}
+            {messages.map((message, index) => {
+              const isLibrarian = message.role === "librarian";
+              return (
+                <div key={`${message.role}-${index}`} className={`flex ${isLibrarian ? "justify-end items-center" : "justify-start items-center"}`}>
+                  {!isLibrarian && (
+                    <div className="mr-2 flex items-center">
+                      <div className="h-8 w-8 rounded-full border border-black/10 bg-white/90 dark:border-white/10 dark:bg-white/10 flex items-center justify-center">
+                        <Bot className="h-4 w-4 text-foreground/70" />
+                      </div>
+                    </div>
+                  )}
+
+                  <div
+                    className={`max-w-[85%] whitespace-pre-wrap wrap-break-word rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                      isLibrarian
+                        ? "bg-amber-600 text-white"
+                        : "border border-black/10 bg-white text-foreground dark:border-white/10 dark:bg-white/10"
+                    }`}
+                  >
+                    {message.role === "assistant" ? renderAssistantContent(message.content) : message.content}
+                  </div>
+
+                  {isLibrarian && (
+                    <div className="ml-2 flex items-center">
+                      {currentUser?.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={currentUser.avatar_url} alt={currentUser.full_name ?? "You"} className="h-8 w-8 rounded-full object-cover" />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-amber-600 flex items-center justify-center text-white font-semibold">
+                          {currentUser?.full_name
+                            ? currentUser.full_name
+                                .split(" ")
+                                .map((s) => s[0])
+                                .slice(0, 2)
+                                .join("")
+                                .toUpperCase()
+                            : "L"}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {choices ? (
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
