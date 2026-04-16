@@ -2,6 +2,31 @@ import { NextResponse } from "next/server";
 
 import supabaseAdmin from "@/lib/supabaseServerClient";
 
+type SearchBookRow = {
+  id: number;
+  title: string;
+  author: string;
+  description: string | null;
+  available_copies: number | null;
+  total_copies: number | null;
+  cover_url: string | null;
+  categories: { name: string | null } | Array<{ name: string | null }> | null;
+};
+
+function normalizeCategory(
+  categories: SearchBookRow["categories"],
+): string | null {
+  if (!categories) {
+    return null;
+  }
+
+  if (Array.isArray(categories)) {
+    return categories[0]?.name ?? null;
+  }
+
+  return categories.name ?? null;
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -13,7 +38,7 @@ export async function GET(req: Request) {
     let builder = supabaseAdmin
       .from("books")
       .select(
-        `id,title,author,category,description,available_copies,total_copies,cover_url`
+        `id,title,author,description,available_copies,total_copies,cover_url,categories(name)`
       )
       .order("title", { ascending: true })
       .range(offset, offset + limit - 1);
@@ -24,7 +49,7 @@ export async function GET(req: Request) {
       builder = supabaseAdmin
         .from("books")
         .select(
-          `id,title,author,category,description,available_copies,total_copies,cover_url`
+          `id,title,author,description,available_copies,total_copies,cover_url,categories(name)`
         )
         .or(`title.ilike.${pattern},author.ilike.${pattern}`)
         .order("title", { ascending: true })
@@ -37,7 +62,18 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ books: data ?? [] });
+    const books = ((data ?? []) as SearchBookRow[]).map((book) => ({
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      description: book.description,
+      available_copies: book.available_copies,
+      total_copies: book.total_copies,
+      cover_url: book.cover_url,
+      category: normalizeCategory(book.categories),
+    }));
+
+    return NextResponse.json({ books });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? String(err) }, { status: 500 });
   }

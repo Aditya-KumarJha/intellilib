@@ -2,7 +2,7 @@
 
 import { Search, Sparkles, X } from "lucide-react";
 
-import type { PublicSearchSort } from "@/components/public/search/types";
+import type { PublicSearchSort } from "@/components/search/types";
 
 type PublicSearchFiltersProps = {
   query: string;
@@ -33,9 +33,9 @@ export default function PublicSearchFilters({
   totalCount,
 }: PublicSearchFiltersProps) {
   return (
-    <section className="rounded-3xl border border-black/10 bg-white/75 p-5 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-white/5 sm:p-6">
+    <section className="max-w-[1400px] overflow-visible rounded-3xl border border-black/10 bg-white/75 p-5 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-white/5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="inline-flex items-center gap-2 rounded-full border border-violet-500/25 bg-violet-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
             <Sparkles className="h-3.5 w-3.5" />
             Open Search Catalog
@@ -48,14 +48,14 @@ export default function PublicSearchFilters({
           </p>
         </div>
 
-        <div className="rounded-2xl border border-black/10 bg-white/80 px-4 py-3 text-right text-xs dark:border-white/10 dark:bg-white/10">
+        <div className="shrink-0 rounded-2xl border border-black/10 bg-white/80 px-4 py-3 text-right text-xs dark:border-white/10 dark:bg-white/10">
           <p className="text-foreground/60">Books in view</p>
           <p className="text-lg font-semibold text-foreground">{totalCount}</p>
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-[1fr_auto] md:items-start">
-        <div className="relative">
+      <div className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-center">
+        <div className="relative min-w-0 flex-1 lg:max-w-4xl">
           <div className="relative">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/45" />
             <input
@@ -89,7 +89,7 @@ export default function PublicSearchFilters({
             </button>
           </div>
 
-          {suggestionOptions.length > 0 ? (
+          {query.trim().length > 0 && suggestionOptions.length > 0 ? (
             <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-2xl border border-black/10 bg-white/95 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-black/75">
               <ul className="max-h-56 overflow-auto py-1">
                 {suggestionOptions.map((option) => (
@@ -108,12 +108,12 @@ export default function PublicSearchFilters({
           ) : null}
         </div>
 
-        <label className="grid gap-1 text-xs font-medium text-foreground/60">
+        <label className="grid w-full gap-1 text-xs font-medium text-foreground/60 sm:max-w-56">
           Sort
           <select
             value={sortBy}
             onChange={(event) => setSortBy(event.target.value as PublicSearchSort)}
-            className="h-12 min-w-44 rounded-2xl border border-black/10 bg-white/80 px-3 text-sm text-foreground outline-none transition focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/20 dark:border-white/10 dark:bg-white/10"
+            className="h-12 w-full rounded-2xl border border-black/10 bg-white/80 px-3 text-sm text-foreground outline-none transition focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/20 dark:border-white/10 dark:bg-white/10"
           >
             {sortOptions.map((option) => (
               <option key={option.value} value={option.value}>

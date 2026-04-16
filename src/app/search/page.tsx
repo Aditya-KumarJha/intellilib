@@ -1,5 +1,5 @@
 import { buildMetadata } from "@/lib/seo";
-import PublicSearchPage from "@/components/public/search/PublicSearchPage";
+import PublicSearchPage from "@/components/public/PublicSearchPage";
 
 export const metadata = buildMetadata({
   title: "Search Books",

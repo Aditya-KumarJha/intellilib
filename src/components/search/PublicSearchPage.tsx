@@ -1,6 +1,6 @@
 import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
-import PublicSearchClient from "@/components/public/search/PublicSearchClient";
+import PublicSearchClient from "@/components/search/PublicSearchClient";
 
 export default function PublicSearchPage() {
   return (

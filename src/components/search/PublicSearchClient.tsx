@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/lib/supabaseClient";
-import PublicBookCard from "@/components/public/search/PublicBookCard";
-import PublicSearchFilters from "@/components/public/search/PublicSearchFilters";
-import { getSuggestionOptions, mapPublicBook, sortPublicBooks } from "@/components/public/search/search-utils";
-import type { PublicBook, PublicBookApiRow, PublicSearchSort } from "@/components/public/search/types";
+import PublicBookCard from "@/components/search/PublicBookCard";
+import PublicSearchFilters from "@/components/search/PublicSearchFilters";
+import { getSuggestionOptions, mapPublicBook, sortPublicBooks } from "@/components/search/search-utils";
+import type { PublicBook, PublicBookApiRow, PublicSearchSort } from "@/components/search/types";
 
 const PAGE_SIZE = 18;
 
@@ -129,7 +129,7 @@ export default function PublicSearchClient() {
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 pb-14 pt-28 sm:px-6 lg:px-8">
+    <div className="w-full space-y-6 px-2 pb-14 pt-28 sm:px-4 lg:px-5 xl:px-6">
       <PublicSearchFilters
         query={query}
         setQuery={setQuery}
@@ -142,7 +142,7 @@ export default function PublicSearchClient() {
       />
 
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {Array.from({ length: 6 }).map((_, index) => (
             <div
               key={index}
@@ -160,7 +160,7 @@ export default function PublicSearchClient() {
         </div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {sortedBooks.map((book) => (
               <PublicBookCard
                 key={book.id}

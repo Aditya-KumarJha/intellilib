@@ -2,9 +2,9 @@
 
 import { BookOpen, Layers, Tag } from "lucide-react";
 
-import type { PublicBook } from "@/components/public/search/types";
-import { availabilityLabel } from "@/components/public/search/search-utils";
-import PublicBookmarkButton from "@/components/public/search/PublicBookmarkButton";
+import type { PublicBook } from "@/components/search/types";
+import { availabilityLabel } from "@/components/search/search-utils";
+import PublicBookmarkButton from "@/components/search/PublicBookmarkButton";
 
 type PublicBookCardProps = {
   book: PublicBook;

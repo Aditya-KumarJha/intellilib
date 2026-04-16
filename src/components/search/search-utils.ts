@@ -1,4 +1,4 @@
-import type { PublicBook, PublicBookApiRow, PublicSearchSort } from "@/components/public/search/types";
+import type { PublicBook, PublicBookApiRow, PublicSearchSort } from "@/components/search/types";
 
 export function mapPublicBook(row: PublicBookApiRow): PublicBook {
   return {

@@ -48,7 +48,7 @@ function TrendChart({ values, labels, stroke, area, yFormatter }: TrendChartProp
           <YAxis hide domain={[0, "auto"]} />
           <Tooltip
             cursor={{ stroke: "rgba(148,163,184,0.4)", strokeWidth: 1 }}
-            formatter={(value: ValueType) => {
+            formatter={(value?: ValueType) => {
               const numeric = Number(value ?? 0);
               return yFormatter ? yFormatter(numeric) : numeric.toLocaleString("en-IN");
             }}
