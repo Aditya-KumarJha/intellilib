@@ -6,23 +6,21 @@ import { notifyUserById, insertNotificationRows } from "@/lib/server/libraryNoti
 import {
   compactQueuePositions,
   getApprovedReservationForUser,
-  getIssueDurationDays,
   getMaxBooksPerUser,
   getPhysicalAvailableCopyIds,
   hasApprovedReservationForAnotherUser,
 } from "@/lib/server/reservationService";
 import { ensureActionAllowedForUser } from "@/lib/server/suspensionGuard";
+import { syncOutstandingFinesForUser } from "@/lib/server/finesService";
 import supabaseAdmin from "@/lib/supabaseServerClient";
+import { isDbTimestampPast } from "@/lib/dateTime";
 
 type IssueBody = {
   bookId?: number;
 };
 
-function addDays(start: Date, days: number) {
-  const value = new Date(start);
-  value.setDate(value.getDate() + days);
-  return value;
-}
+const MAX_BOOKS_REACHED_MESSAGE =
+  "You have reached the maximum allowed issued books. Please return a book first to issue more.";
 
 export async function POST(req: Request) {
   const user = await getUserFromRequest(req);
@@ -68,11 +66,13 @@ export async function POST(req: Request) {
     .is("return_date", null);
 
   const hasOverdue = (activeTransactions ?? []).some((tx) => {
-    const dueDateValue = tx.due_date ? new Date(tx.due_date).getTime() : Number.POSITIVE_INFINITY;
-    return tx.status === "overdue" || dueDateValue < Date.now();
+    return tx.status === "overdue" || isDbTimestampPast(tx.due_date);
   });
 
   if (hasOverdue) {
+    await syncOutstandingFinesForUser(user.id).catch(() => {
+      // Best-effort sync; blocking reason remains overdue regardless.
+    });
     return NextResponse.json(
       { error: "You have overdue books. Return them before issuing a new one." },
       { status: 409 },
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
   const maxBooksPerUser = await getMaxBooksPerUser();
   if ((activeTransactions?.length ?? 0) >= maxBooksPerUser) {
     return NextResponse.json(
-      { error: `You have reached your issue limit of ${maxBooksPerUser} active books.` },
+      { error: MAX_BOOKS_REACHED_MESSAGE },
       { status: 409 },
     );
   }
@@ -102,9 +102,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const issueDays = await getIssueDurationDays();
   const now = new Date();
-  const dueDate = addDays(now, issueDays).toISOString();
 
   const ownApprovedReservation = await getApprovedReservationForUser(bookId, user.id);
   const reservedForAnotherUser = ownApprovedReservation
@@ -136,6 +134,7 @@ export async function POST(req: Request) {
     | {
         id: number;
         book_copy_id: number;
+        due_date: string | null;
       }
     | null = null;
   let raceFailures = 0;
@@ -148,10 +147,9 @@ export async function POST(req: Request) {
         user_id: user.id,
         book_copy_id: copyId,
         issue_date: now.toISOString(),
-        due_date: dueDate,
         status: "issued",
       })
-      .select("id,book_copy_id")
+      .select("id,book_copy_id,due_date")
       .maybeSingle();
 
     if (!error && data) {
@@ -184,6 +182,13 @@ export async function POST(req: Request) {
     if (combined.includes("has overdue books")) {
       return NextResponse.json(
         { error: "You have overdue books. Return them before issuing a new one." },
+        { status: 409 },
+      );
+    }
+
+    if (combined.includes("reached max limit") || combined.includes("max limit")) {
+      return NextResponse.json(
+        { error: MAX_BOOKS_REACHED_MESSAGE },
         { status: 409 },
       );
     }
@@ -238,11 +243,14 @@ export async function POST(req: Request) {
     await compactQueuePositions(bookId);
   }
 
-  const dueText = new Date(dueDate).toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const dueDate = inserted.due_date;
+  const dueText = dueDate
+    ? new Date(dueDate).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "as per current library policy";
 
   await notifyUserById(user.id, {
     inAppMessage: `${bookRow.title} issued successfully. Collect from the counter with your ID card before ${dueText}.`,

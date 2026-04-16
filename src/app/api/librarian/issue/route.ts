@@ -6,12 +6,13 @@ import { notifyUserById } from "@/lib/server/libraryNotifications";
 import {
   compactQueuePositions,
   getApprovedReservationForUser,
-  getIssueDurationDays,
   getMaxBooksPerUser,
   getPhysicalAvailableCopyIds,
   hasApprovedReservationForAnotherUser,
 } from "@/lib/server/reservationService";
+import { syncOutstandingFinesForUser } from "@/lib/server/finesService";
 import supabaseAdmin from "@/lib/supabaseServerClient";
+import { isDbTimestampPast } from "@/lib/dateTime";
 
 type IssueBody = {
   memberId?: string;
@@ -22,11 +23,8 @@ function isStaffRole(role: string | null | undefined) {
   return role === "admin" || role === "librarian";
 }
 
-function addDays(start: Date, days: number) {
-  const value = new Date(start);
-  value.setDate(value.getDate() + days);
-  return value;
-}
+const MAX_BOOKS_REACHED_MESSAGE =
+  "Member already has the maximum allowed issued books. Ask them to return one first.";
 
 export async function POST(req: Request) {
   const caller = await getUserFromRequest(req);
@@ -91,17 +89,19 @@ export async function POST(req: Request) {
     .is("return_date", null);
 
   const hasOverdue = (activeTransactions ?? []).some((row: { status: string | null; due_date: string | null }) => {
-    const dueDate = row.due_date ? new Date(row.due_date).getTime() : Number.POSITIVE_INFINITY;
-    return row.status === "overdue" || dueDate < Date.now();
+    return row.status === "overdue" || isDbTimestampPast(row.due_date);
   });
 
   if (hasOverdue) {
+    await syncOutstandingFinesForUser(memberId).catch(() => {
+      // Best-effort sync; issuing still stays blocked for overdue members.
+    });
     return NextResponse.json({ error: "Member has overdue books and cannot issue a new one." }, { status: 409 });
   }
 
   const maxBooksPerUser = await getMaxBooksPerUser();
   if ((activeTransactions?.length ?? 0) >= maxBooksPerUser) {
-    return NextResponse.json({ error: `Member reached the limit of ${maxBooksPerUser} active books.` }, { status: 409 });
+    return NextResponse.json({ error: MAX_BOOKS_REACHED_MESSAGE }, { status: 409 });
   }
 
   const { data: duplicateIssue } = await supabaseAdmin
@@ -133,11 +133,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No physical copy is available right now." }, { status: 409 });
   }
 
-  const issueDays = await getIssueDurationDays();
   const now = new Date();
-  const dueDate = addDays(now, issueDays).toISOString();
-
-  let inserted: { id: number; book_copy_id: number } | null = null;
+  let inserted: { id: number; book_copy_id: number; due_date: string | null } | null = null;
   let lastErrorMessage: string | null = null;
 
   for (const copyId of availableCopyIds) {
@@ -147,10 +144,9 @@ export async function POST(req: Request) {
         user_id: memberId,
         book_copy_id: copyId,
         issue_date: now.toISOString(),
-        due_date: dueDate,
         status: "issued",
       })
-      .select("id,book_copy_id")
+      .select("id,book_copy_id,due_date")
       .maybeSingle();
 
     if (!error && data) {
@@ -161,6 +157,10 @@ export async function POST(req: Request) {
     const text = `${error?.message ?? ""} ${error?.details ?? ""}`.toLowerCase();
     const raceConflict = error?.code === "23505" || text.includes("unique_active_issue") || text.includes("duplicate key");
     if (raceConflict) continue;
+
+    if (text.includes("reached max limit") || text.includes("max limit")) {
+      return NextResponse.json({ error: MAX_BOOKS_REACHED_MESSAGE }, { status: 409 });
+    }
 
     lastErrorMessage = error?.message ?? "Could not issue this title right now.";
     break;
@@ -178,11 +178,14 @@ export async function POST(req: Request) {
     await compactQueuePositions(bookId);
   }
 
-  const dueText = new Date(dueDate).toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const dueDate = inserted.due_date;
+  const dueText = dueDate
+    ? new Date(dueDate).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "as per current library policy";
 
   await notifyUserById(memberId, {
     inAppMessage: `${bookRow.title} has been issued by library desk. Due: ${dueText}.`,

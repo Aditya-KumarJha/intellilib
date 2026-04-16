@@ -446,30 +446,34 @@ async function insertFinesAndPayments(members, transactions) {
   assertNoError(paymentErr, "insert payments");
 }
 
-async function insertReservations(members, bookMap) {
+async function insertReservations(members, bookMap, transactions = []) {
   const ddiaId = bookMap["9781449373320"].id;
-  const aiBasicsId = bookMap["9781484250273"].id;
+
+  // fallback safety
+  if (!Array.isArray(transactions)) transactions = [];
+
+  const activeUserIds = new Set(
+    transactions
+      .filter((t) => !t.return_date)
+      .map((t) => t.user_id)
+  );
+
+  const safeUsers = members.filter((u) => !activeUserIds.has(u.id));
+
+  if (safeUsers.length === 0) {
+    console.log("⚠️ No safe users for reservation, skipping...");
+    return;
+  }
 
   const { error } = await supabase.from("reservations").insert([
     {
-      user_id: members[0].id,
+      user_id: safeUsers[0].id,
       book_id: ddiaId,
       queue_position: 1,
       status: "waiting",
     },
-    {
-      user_id: members[1].id,
-      book_id: ddiaId,
-      queue_position: 2,
-      status: "approved",
-    },
-    {
-      user_id: members[0].id,
-      book_id: aiBasicsId,
-      queue_position: null,
-      status: "cancelled",
-    },
   ]);
+
   assertNoError(error, "insert reservations");
 }
 

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 
 import { formatCurrency } from "@/components/dashboard/user/my-books/my-books-utils";
+import { dbTimestampToEpochMs } from "@/lib/dateTime";
 import { supabase } from "@/lib/supabaseClient";
 
 type FineTransaction = {
@@ -100,8 +101,8 @@ function pickOne<T>(value: T | T[] | null | undefined): T | null {
 
 function daysLabelFromTx(tx: FineTransaction | null): string {
   if (!tx) return "";
-  const due = tx.due_date ? new Date(tx.due_date).getTime() : null;
-  const returned = tx.return_date ? new Date(tx.return_date).getTime() : null;
+  const due = dbTimestampToEpochMs(tx.due_date);
+  const returned = dbTimestampToEpochMs(tx.return_date);
   if (!due) return "No due date";
   if (returned) return "Returned";
   const diffDays = Math.ceil((due - Date.now()) / (1000 * 60 * 60 * 24));
@@ -175,23 +176,22 @@ export default function UserFinesSection() {
         setUserId(resolvedUserId);
       }
 
-      const { data, error: fetchError } = await supabase
-        .from("fines")
-        .select(
-          "id,amount,transaction_id,paid_at,created_at,status,transactions(id,issue_date,due_date,return_date,status,fine_amount,book_copies(id,location,access_url,books(id,title,author,cover_url,publisher)))",
-        )
-        .eq("user_id", resolvedUserId)
-        .order("created_at", { ascending: false });
+      const res = await authedFetch("/api/library/fines", { method: "GET" });
+      const payload = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        fines?: FineRow[];
+        error?: string;
+      };
 
       if (!isActive) return;
 
-      if (fetchError) {
+      if (!res.ok || !payload.ok) {
         setError("Could not load fines. Please try again later.");
         setFines([]);
         return;
       }
 
-      setFines((data ?? []) as FineRow[]);
+      setFines(payload.fines ?? []);
     } catch (fetchError: unknown) {
       if (!isActive) return;
       const message = fetchError instanceof Error ? fetchError.message : "Could not load fines";

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/server/apiAuth";
 import { logAuditEvent } from "@/lib/server/auditLogs";
 import { notifyUserById } from "@/lib/server/libraryNotifications";
-import { compactQueuePositions, getPhysicalAvailableCopyIds } from "@/lib/server/reservationService";
+import { compactQueuePositions, getMaxBooksPerUser, getPhysicalAvailableCopyIds } from "@/lib/server/reservationService";
 import { ensureActionAllowedForUser } from "@/lib/server/suspensionGuard";
 import supabaseAdmin from "@/lib/supabaseServerClient";
 
@@ -16,6 +16,9 @@ type QueueInsertError = {
 type ReservationBody = {
   bookId?: number;
 };
+
+const MAX_BOOKS_REACHED_MESSAGE =
+  "You have reached the maximum allowed issued books. Please return a book first before placing a new reservation.";
 
 type QueuedReservationInsert = { id: number; queue_position: number };
 
@@ -173,10 +176,31 @@ export async function POST(req: Request) {
     );
   }
 
+  const { count: activeLoanCount } = await supabaseAdmin
+    .from("transactions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .is("return_date", null);
+
+  const maxBooksPerUser = await getMaxBooksPerUser();
+  if (Number(activeLoanCount ?? 0) >= maxBooksPerUser) {
+    return NextResponse.json({ error: MAX_BOOKS_REACHED_MESSAGE }, { status: 409 });
+  }
+
   const { inserted, error: insertError } = await createQueuedReservation(user.id, bookId);
 
   if (insertError || !inserted) {
     const message = String(insertError?.message ?? "Could not create reservation");
+    const combined = `${message} ${String(insertError?.details ?? "")}`.toLowerCase();
+
+    if (combined.includes("reached max book limit") || combined.includes("reached max limit") || combined.includes("max book limit")) {
+      return NextResponse.json({ error: MAX_BOOKS_REACHED_MESSAGE }, { status: 409 });
+    }
+
+    if (combined.includes("already holds an active issued copy") || combined.includes("already has an active copy")) {
+      return NextResponse.json({ error: "You already hold an active copy of this title." }, { status: 409 });
+    }
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 

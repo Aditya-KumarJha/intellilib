@@ -14,7 +14,7 @@ type MailJob = {
 
 type NotificationRowInsert = Record<string, unknown>;
 
-export type NotificationType = "due_reminder" | "fine_alert" | "payment_success" | "reservation_update";
+export type NotificationType = "due_reminder" | "fine_alert" | "payment_success" | "payment_failed" | "reservation_update";
 
 export async function createInAppNotification(userId: string, message: string) {
   await insertNotificationRows({
@@ -129,6 +129,54 @@ export async function notifyUserById(
     subject: payload.subject,
     html: payload.html,
     text: payload.text,
+  });
+}
+
+export async function notifyPaymentSuccess(
+  userId: string,
+  amount: number,
+  fineCount: number,
+  provider: string,
+  method?: string,
+) {
+  const providerLabel = provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : "Payment provider";
+  const methodLabel = method ? ` via ${method}` : "";
+  const inAppMessage = `Payment successful for ${fineCount} fine${fineCount > 1 ? "s" : ""}${methodLabel}.`;
+  const subject = `IntelliLib: Payment Successful`;
+  const text = `Your ${providerLabel} payment was verified successfully for INR ${amount}.`;
+  const html = `<p>Your ${providerLabel} payment was verified successfully for <strong>INR ${amount}</strong>.</p>`;
+
+  await notifyUserById(userId, {
+    inAppMessage,
+    subject,
+    text,
+    html,
+    type: "payment_success",
+    metadata: { provider, method, amount, fineCount },
+  });
+}
+
+export async function notifyPaymentFailure(
+  userId: string,
+  amount: number | null,
+  reason: string,
+  provider: string,
+  method?: string,
+) {
+  const providerLabel = provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : "Payment provider";
+  const methodLabel = method ? ` via ${method}` : "";
+  const inAppMessage = `Payment failed${methodLabel}. Reason: ${reason}`;
+  const subject = `IntelliLib: Payment Failed`;
+  const text = amount ? `Your ${providerLabel} payment for INR ${amount} failed. Reason: ${reason}` : `Your ${providerLabel} payment failed. Reason: ${reason}`;
+  const html = `<p>Your ${providerLabel} payment ${amount ? `for <strong>INR ${amount}</strong> ` : ""}failed. Reason: ${reason}</p>`;
+
+  await notifyUserById(userId, {
+    inAppMessage,
+    subject,
+    text,
+    html,
+    type: "payment_failed",
+    metadata: { provider, method, amount, reason },
   });
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 
 import UserPanelCard from "@/components/dashboard/user/UserPanelCard";
+import { dbTimestampToEpochMs } from "@/lib/dateTime";
 import { supabase } from "@/lib/supabaseClient";
 
 type RecentIssueRow = {
@@ -104,13 +105,15 @@ export default function ContinueReadingPanel() {
       const currentCopy = pickOne(current?.book_copies);
       const currentBook = pickOne(currentCopy?.books);
 
-      const dueText = current?.due_date
-        ? new Date(current.due_date).toLocaleDateString("en-IN", { dateStyle: "medium" })
+      const dueEpoch = dbTimestampToEpochMs(current?.due_date ?? null);
+      const dueText = dueEpoch
+        ? new Date(dueEpoch).toLocaleDateString("en-IN", { dateStyle: "medium" })
         : "-";
 
       const progress = current?.due_date
         ? (() => {
-            const days = Math.ceil((new Date(current.due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            if (dueEpoch == null) return "Due date unavailable";
+            const days = Math.ceil((dueEpoch - Date.now()) / (1000 * 60 * 60 * 24));
             if (days < 0) return `${Math.abs(days)} day(s) overdue`;
             if (days === 0) return "Due today";
             return `${days} day(s) remaining`;

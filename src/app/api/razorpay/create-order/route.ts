@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 
 import { getUserFromRequest } from "@/lib/server/apiAuth";
 import { logAuditEvent } from "@/lib/server/auditLogs";
@@ -66,12 +67,20 @@ export async function POST(req: Request) {
   const orderPayload = {
     amount: Math.round(totalAmount * 100),
     currency,
-    receipt: `fines_${user.id}_${Date.now()}`,
+    receipt: makeReceipt(user.id),
     notes: {
       user_id: user.id,
       fine_ids: normalizedFines.map((row) => row.id).join(","),
     },
   };
+
+  function makeReceipt(userId: string | number) {
+    const base = `fines_${String(userId)}`;
+    const candidate = `${base}_${Date.now().toString(36)}`;
+    if (candidate.length <= 40) return candidate;
+    const hash = crypto.createHash("sha256").update(`${userId}:${Date.now()}`).digest("hex").slice(0, 12);
+    return `fines_${hash}`;
+  }
 
   try {
     const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
@@ -84,9 +93,20 @@ export async function POST(req: Request) {
       body: JSON.stringify(orderPayload),
     });
 
-    const data = (await res.json().catch(() => ({}))) as { id?: string; amount?: number; currency?: string; error?: unknown };
-    if (!res.ok || !data.id) {
-      return NextResponse.json({ error: "Could not create Razorpay order.", detail: data.error ?? data }, { status: 500 });
+    const resText = await res.text().catch(() => "");
+    let data: { id?: string; amount?: number; currency?: string; error?: unknown } | string = {};
+    try {
+      data = resText ? JSON.parse(resText) : {};
+    } catch {
+      data = resText;
+    }
+
+    if (!res.ok || !(typeof data === "object" && (data as any).id)) {
+      console.error("Razorpay order creation failed:", { status: res.status, statusText: res.statusText, body: data });
+      return NextResponse.json(
+        { error: "Could not create Razorpay order.", detail: { status: res.status, statusText: res.statusText, body: data } },
+        { status: 500 }
+      );
     }
 
     await supabaseAdmin

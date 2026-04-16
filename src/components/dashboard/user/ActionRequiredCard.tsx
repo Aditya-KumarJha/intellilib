@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
 import UserPanelCard from "@/components/dashboard/user/UserPanelCard";
+import { dbTimestampToEpochMs } from "@/lib/dateTime";
 import { supabase } from "@/lib/supabaseClient";
 
 import useAuthStore from "@/lib/authStore";
@@ -39,17 +40,21 @@ export default function ActionRequiredCard() {
       const userId = user?.id;
       if (!userId || !mounted) return;
 
-      const now = new Date();
-      const threeDaysAhead = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+      const nowMs = Date.now();
+      const threeDaysAheadMs = nowMs + 3 * 24 * 60 * 60 * 1000;
 
-      const [dueSoonRes, overdueRes, fineRes, profileRes] = await Promise.all([
-        supabase
-          .from("transactions")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", userId)
-          .is("return_date", null)
-          .gte("due_date", now.toISOString())
-          .lte("due_date", threeDaysAhead.toISOString()),
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (token) {
+        await fetch("/api/library/fines", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {
+          // If sync fails, fallback to currently persisted fine rows.
+        });
+      }
+
+      const [openTxRes, fineRes, profileRes] = await Promise.all([
         supabase
           .from("transactions")
           .select("id,due_date,status")
@@ -69,15 +74,21 @@ export default function ActionRequiredCard() {
 
       if (!mounted) return;
 
-      const overdueCount = (overdueRes.data ?? []).filter((item) => {
-        const due = item.due_date ? new Date(item.due_date).getTime() : Number.POSITIVE_INFINITY;
-        return item.status === "overdue" || due < Date.now();
+      const txRows = openTxRes.data ?? [];
+      const overdueCount = txRows.filter((item) => {
+        const due = dbTimestampToEpochMs(item.due_date) ?? Number.POSITIVE_INFINITY;
+        return item.status === "overdue" || due < nowMs;
+      }).length;
+
+      const dueSoonCount = txRows.filter((item) => {
+        const due = dbTimestampToEpochMs(item.due_date);
+        return due != null && due >= nowMs && due <= threeDaysAheadMs;
       }).length;
 
       const unpaidFineTotal = (fineRes.data ?? []).reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
 
       setMetrics({
-        dueIn3Days: Number(dueSoonRes.count ?? 0),
+        dueIn3Days: dueSoonCount,
         overdue: overdueCount,
         unpaidFineTotal,
       });
@@ -118,7 +129,7 @@ export default function ActionRequiredCard() {
         value: suspensionInfo.status === "active" ? "Active" : "Suspended",
         tone: (suspensionInfo.status === "active" ? "emerald" : "red") as keyof typeof toneStyles,
       },
-      { label: "Books due in 3 days", value: String(metrics.dueIn3Days), tone: "orange" as const },
+      { label: "Books due soon", value: String(metrics.dueIn3Days), tone: "orange" as const },
       { label: "Overdue books", value: String(metrics.overdue), tone: "red" as const },
       { label: "Unpaid fine", value: `INR ${Math.round(metrics.unpaidFineTotal)}`, tone: "yellow" as const },
     ],

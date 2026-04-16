@@ -10,12 +10,13 @@ import { notifyUserById, insertNotificationRows } from "@/lib/server/libraryNoti
 import {
   compactQueuePositions,
   getApprovedReservationForUser,
-  getIssueDurationDays,
   getMaxBooksPerUser,
   getPhysicalAvailableCopyIds,
   hasApprovedReservationForAnotherUser,
 } from "@/lib/server/reservationService";
+import { syncOutstandingFinesForUser } from "@/lib/server/finesService";
 import supabaseAdmin from "@/lib/supabaseServerClient";
+import { isDbTimestampPast } from "@/lib/dateTime";
 
 type ChatRole = "user" | "assistant";
 
@@ -63,6 +64,9 @@ const REFUSAL_MESSAGE =
 
 const GENERIC_ASSISTANT_ERROR_MESSAGE =
   "I could not complete that request right now. Please try again in a moment.";
+
+const MAX_BOOKS_REACHED_MESSAGE =
+  "You already have the maximum allowed issued books. Please return one first to issue more.";
 
 const AGENT_RECURSION_LIMIT = 12;
 
@@ -746,17 +750,19 @@ function createTools(userId: string) {
         .is("return_date", null);
 
       const hasOverdue = (activeTransactions ?? []).some((tx) => {
-        const dueDateValue = tx.due_date ? new Date(tx.due_date).getTime() : Number.POSITIVE_INFINITY;
-        return tx.status === "overdue" || dueDateValue < Date.now();
+        return tx.status === "overdue" || isDbTimestampPast(tx.due_date);
       });
 
       if (hasOverdue) {
+        await syncOutstandingFinesForUser(userId).catch(() => {
+          // Best-effort sync; assistant still blocks issue for overdue users.
+        });
         return "Issue blocked: you have overdue books. Return them before issuing new books.";
       }
 
       const maxBooksPerUser = await getMaxBooksPerUser();
       if ((activeTransactions?.length ?? 0) >= maxBooksPerUser) {
-        return `Issue blocked: you have reached your limit of ${maxBooksPerUser} active books.`;
+        return `Issue blocked: ${MAX_BOOKS_REACHED_MESSAGE}`;
       }
 
       const { data: duplicateIssue } = await supabaseAdmin
@@ -786,15 +792,15 @@ function createTools(userId: string) {
       }
 
       const now = new Date();
-      const issueDays = await getIssueDurationDays();
-      const dueDate = new Date(now.getTime() + issueDays * 24 * 60 * 60 * 1000).toISOString();
 
       let inserted:
         | {
             id: number;
             book_copy_id: number;
+            due_date: string | null;
           }
         | null = null;
+      let issueFailureMessage: string | null = null;
 
       for (const copyId of availableCopyIds) {
         const { data, error } = await supabaseAdmin
@@ -803,27 +809,52 @@ function createTools(userId: string) {
             user_id: userId,
             book_copy_id: copyId,
             issue_date: now.toISOString(),
-            due_date: dueDate,
             status: "issued",
           })
-          .select("id,book_copy_id")
+          .select("id,book_copy_id,due_date")
           .maybeSingle();
 
         if (!error && data) {
           inserted = data;
           break;
         }
+
+        const combined = `${error?.message ?? ""} ${error?.details ?? ""}`.toLowerCase();
+        if (error?.code === "23505" || combined.includes("unique_active_issue") || combined.includes("duplicate key")) {
+          continue;
+        }
+
+        if (combined.includes("has overdue books")) {
+          return "Issue blocked: you have overdue books. Return them before issuing new books.";
+        }
+
+        if (combined.includes("already has an active copy of book")) {
+          return `Issue blocked: you already hold an active copy of ${book.title}.`;
+        }
+
+        if (combined.includes("reached max limit") || combined.includes("max limit")) {
+          return `Issue blocked: ${MAX_BOOKS_REACHED_MESSAGE}`;
+        }
+
+        issueFailureMessage = error?.message ?? null;
+        break;
       }
 
       if (!inserted) {
+        if (issueFailureMessage) {
+          return `Issue failed for ${book.title}: ${issueFailureMessage}`;
+        }
         return `Issue failed for ${book.title}. Another user may have taken the last copy. Try reservation.`;
       }
 
-      const dueText = new Date(dueDate).toLocaleString("en-IN", {
-        timeZone: "Asia/Kolkata",
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
+      const dueDate = inserted.due_date;
+      const dueText = dueDate
+        ? new Date(dueDate).toLocaleString("en-IN", {
+            timeZone: "Asia/Kolkata",
+            dateStyle: "medium",
+            timeStyle: "short",
+          })
+        : "as per current library policy";
 
       await notifyUserById(userId, {
         inAppMessage: `${book.title} issued successfully. Due on ${dueText}.`,
@@ -910,6 +941,17 @@ function createTools(userId: string) {
 
       if ((activeHold ?? []).length > 0) {
         return `Reservation blocked: you already hold an active copy of ${book.title}.`;
+      }
+
+      const { count: activeLoanCount } = await supabaseAdmin
+        .from("transactions")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .is("return_date", null);
+
+      const maxBooksPerUser = await getMaxBooksPerUser();
+      if (Number(activeLoanCount ?? 0) >= maxBooksPerUser) {
+        return `Reservation blocked: ${MAX_BOOKS_REACHED_MESSAGE}`;
       }
 
       const inserted = await createQueuedReservation(userId, book.id);

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlarmClock, Bot, BookOpen, CreditCard } from "lucide-react";
 
 import DashboardStatCard from "@/components/dashboard/DashboardStatCard";
+import { dbTimestampToEpochMs } from "@/lib/dateTime";
 import { supabase } from "@/lib/supabaseClient";
 
 import useAuthStore from "@/lib/authStore";
@@ -33,14 +34,25 @@ export default function UserStatsRow() {
       const userId = user?.id;
       if (!userId || !mounted) return;
 
-      const now = new Date();
-      const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const nowMs = Date.now();
+      const weekEndMs = nowMs + 7 * 24 * 60 * 60 * 1000;
+      const sevenDaysAgo = new Date(nowMs - 7 * 24 * 60 * 60 * 1000);
 
-      const [activeTxRes, activeReservationRes, dueTxRes, finesRes, assistantUsageRes] = await Promise.all([
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (token) {
+        await fetch("/api/library/fines", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {
+          // If sync fails here, metrics still load from existing rows.
+        });
+      }
+
+      const [activeTxRes, activeReservationRes, finesRes, assistantUsageRes] = await Promise.all([
         supabase
           .from("transactions")
-          .select("id", { count: "exact", head: true })
+          .select("id,due_date,status")
           .eq("user_id", userId)
           .is("return_date", null),
         supabase
@@ -48,13 +60,6 @@ export default function UserStatsRow() {
           .select("id", { count: "exact", head: true })
           .eq("user_id", userId)
           .in("status", ["waiting", "approved"]),
-        supabase
-          .from("transactions")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", userId)
-          .is("return_date", null)
-          .gte("due_date", now.toISOString())
-          .lte("due_date", weekEnd.toISOString()),
         supabase
           .from("fines")
           .select("amount")
@@ -70,11 +75,15 @@ export default function UserStatsRow() {
       if (!mounted) return;
 
       const unpaidFineTotal = (finesRes.data ?? []).reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+      const dueThisWeek = (activeTxRes.data ?? []).filter((tx) => {
+        const dueMs = dbTimestampToEpochMs(tx.due_date);
+        return dueMs != null && dueMs >= nowMs && dueMs <= weekEndMs;
+      }).length;
 
       setStats({
-        activeIssued: Number(activeTxRes.count ?? 0),
+        activeIssued: (activeTxRes.data ?? []).length,
         activeReserved: Number(activeReservationRes.count ?? 0),
-        dueThisWeek: Number(dueTxRes.count ?? 0),
+        dueThisWeek,
         unpaidFineTotal,
         aiQueries7d: Number(assistantUsageRes.count ?? 0),
       });
@@ -98,7 +107,7 @@ export default function UserStatsRow() {
         tone: "violet" as const,
       },
       {
-        label: "Due This Week",
+        label: "Due Soon",
         value: String(stats.dueThisWeek),
         hint: "Return or renew soon",
         icon: AlarmClock,

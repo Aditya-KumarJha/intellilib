@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { getUserFromRequest } from "@/lib/server/apiAuth";
 import { logAuditEvent } from "@/lib/server/auditLogs";
-import { notifyUserById } from "@/lib/server/libraryNotifications";
+import { notifyPaymentSuccess, notifyPaymentFailure } from "@/lib/server/libraryNotifications";
 import { ensureActionAllowedForUser } from "@/lib/server/suspensionGuard";
 import supabaseAdmin from "@/lib/supabaseServerClient";
 
@@ -42,6 +42,18 @@ async function fetchOrderDetails(orderId: string, keyId: string, keySecret: stri
   return (await res.json().catch(() => null)) as RazorpayOrderResponse | null;
 }
 
+async function fetchPaymentDetails(paymentId: string, keyId: string, keySecret: string) {
+  const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+  const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
+    headers: {
+      Authorization: `Basic ${auth}`,
+    },
+  });
+
+  if (!res.ok) return null;
+  return (await res.json().catch(() => null)) as Record<string, unknown> | null;
+}
+
 export async function POST(req: Request) {
   const user = await getUserFromRequest(req);
   if (!user) {
@@ -74,16 +86,55 @@ export async function POST(req: Request) {
     .digest("hex");
 
   if (generated !== razorpaySignature) {
+    // record failed payment attempt and notify user
+    try {
+      await supabaseAdmin.from("payments").insert({
+        user_id: user.id,
+        razorpay_order_id: razorpayOrderId || null,
+        razorpay_payment_id: razorpayPaymentId || null,
+        amount: 0,
+        provider: "razorpay",
+        status: "failed",
+        method: "unknown",
+      });
+    } catch (e) {
+      // ignore DB failures
+    }
+    await notifyPaymentFailure(user.id, null, "Invalid signature", "razorpay", "unknown");
     return NextResponse.json({ ok: false, error: "Invalid signature" }, { status: 400 });
   }
 
   try {
     const order = await fetchOrderDetails(razorpayOrderId, keyId, keySecret);
     if (!order?.id) {
+      try {
+        await supabaseAdmin.from("payments").insert({
+          user_id: user.id,
+          razorpay_order_id: razorpayOrderId || null,
+          razorpay_payment_id: razorpayPaymentId || null,
+          amount: 0,
+          provider: "razorpay",
+          status: "failed",
+          method: "unknown",
+        });
+      } catch {}
+      await notifyPaymentFailure(user.id, null, "Could not verify order details", "razorpay", "unknown");
       return NextResponse.json({ ok: false, error: "Could not verify order details." }, { status: 500 });
     }
 
     if (order.notes?.user_id !== user.id) {
+      try {
+        await supabaseAdmin.from("payments").insert({
+          user_id: user.id,
+          razorpay_order_id: razorpayOrderId || null,
+          razorpay_payment_id: razorpayPaymentId || null,
+          amount: 0,
+          provider: "razorpay",
+          status: "failed",
+          method: "unknown",
+        });
+      } catch {}
+      await notifyPaymentFailure(user.id, null, "Payment does not belong to the current user", "razorpay", "unknown");
       return NextResponse.json({ ok: false, error: "Payment does not belong to the current user." }, { status: 403 });
     }
 
@@ -126,16 +177,64 @@ export async function POST(req: Request) {
       .is("paid_at", null);
 
     if (fineError) {
+      try {
+        await supabaseAdmin.from("payments").insert({
+          user_id: user.id,
+          razorpay_order_id: razorpayOrderId || null,
+          razorpay_payment_id: razorpayPaymentId || null,
+          amount: 0,
+          provider: "razorpay",
+          status: "failed",
+          method: "unknown",
+        });
+      } catch {}
+      await notifyPaymentFailure(user.id, null, "Could not load fines for verification", "razorpay", "unknown");
       return NextResponse.json({ ok: false, error: "Could not load fines for verification." }, { status: 500 });
     }
 
     const payableFines = (fineRows ?? []) as FineRecord[];
+    const totalAmount = payableFines.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
     if (payableFines.length !== fineIds.length) {
+      try {
+        await supabaseAdmin.from("payments").insert({
+          user_id: user.id,
+          razorpay_order_id: razorpayOrderId || null,
+          razorpay_payment_id: razorpayPaymentId || null,
+          amount: totalAmount,
+          provider: "razorpay",
+          status: "failed",
+          method: "unknown",
+        });
+      } catch {}
+      await notifyPaymentFailure(user.id, totalAmount, "Some fines are already paid or unavailable", "razorpay", "unknown");
       return NextResponse.json({ ok: false, error: "Some fines are already paid or unavailable." }, { status: 409 });
     }
 
     const now = new Date().toISOString();
-    const totalAmount = payableFines.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+
+    const paymentDetails = await fetchPaymentDetails(razorpayPaymentId, keyId, keySecret);
+    const rawMethod = paymentDetails && typeof paymentDetails.method === "string" ? (paymentDetails.method as string) : "unknown";
+    // Build a human-friendly label for the UI, include card/UPI info when available
+    let methodLabel = rawMethod;
+    try {
+      if (rawMethod === "card" && paymentDetails && typeof paymentDetails.card === "object") {
+        const card = paymentDetails.card as Record<string, any>;
+        const last4 = card?.last4 || card?.last_4 || card?.last || null;
+        methodLabel = last4 ? `Card ending ${last4}` : "Card";
+      } else if (rawMethod === "upi" && paymentDetails && typeof paymentDetails.vpa === "string") {
+        methodLabel = `UPI (${paymentDetails.vpa})`;
+      } else if (rawMethod === "netbanking" && paymentDetails && typeof paymentDetails.bank === "string") {
+        methodLabel = `Netbanking (${paymentDetails.bank})`;
+      } else if (rawMethod === "wallet" && paymentDetails && typeof paymentDetails.wallet === "string") {
+        methodLabel = `Wallet (${paymentDetails.wallet})`;
+      } else {
+        // normalize common tokens
+        methodLabel = rawMethod === "upi" ? "UPI" : rawMethod === "card" ? "Card" : rawMethod === "netbanking" ? "Netbanking" : rawMethod;
+      }
+    } catch (e) {
+      methodLabel = rawMethod;
+    }
+
     const paymentPayload = {
       user_id: user.id,
       fine_id: payableFines[0]?.id ?? null,
@@ -145,7 +244,7 @@ export async function POST(req: Request) {
       razorpay_payment_id: razorpayPaymentId,
       razorpay_signature: razorpaySignature,
       status: "success" as const,
-      method: "razorpay",
+      method: rawMethod,
     };
 
     if (existingPayment?.id) {
@@ -173,6 +272,8 @@ export async function POST(req: Request) {
       entityId: existingPayment?.id ?? null,
       metadata: {
         provider: "razorpay",
+        method: rawMethod,
+        method_label: methodLabel,
         orderId: razorpayOrderId,
         paymentId: razorpayPaymentId,
         fineIds,
@@ -191,19 +292,15 @@ export async function POST(req: Request) {
           transactionId: fine.transaction_id,
           amount: fine.amount,
           provider: "razorpay",
+          method: rawMethod,
+          method_label: methodLabel,
           orderId: razorpayOrderId,
           paymentId: razorpayPaymentId,
         },
       });
     }
 
-    await notifyUserById(user.id, {
-      inAppMessage: `Payment successful for ${fineIds.length} fine${fineIds.length > 1 ? "s" : ""}.`,
-      subject: "IntelliLib: Payment Successful",
-      text: `Your Razorpay payment was verified successfully for INR ${totalAmount}.`,
-      html: `<p>Your Razorpay payment was verified successfully for <strong>INR ${totalAmount}</strong>.</p>`,
-      type: "payment_success",
-    });
+    await notifyPaymentSuccess(user.id, totalAmount, fineIds.length, "razorpay", methodLabel);
 
     return NextResponse.json({ ok: true, amount: totalAmount, fineCount: fineIds.length });
   } catch (error: unknown) {

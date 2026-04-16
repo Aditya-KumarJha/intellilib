@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS public.books (
   author TEXT NOT NULL,
   description TEXT,
   type TEXT NOT NULL DEFAULT 'physical' CHECK (type IN ('physical', 'digital', 'both')),
-  category_id BIGINT REFERENCES public.categories(id),
+  category_id BIGINT REFERENCES public.categories(id) ON DELETE SET NULL,
   isbn TEXT UNIQUE,
   cover_url TEXT,
   pdf_url TEXT,
@@ -95,8 +95,8 @@ CREATE TABLE IF NOT EXISTS public.book_copies (
 -- -------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.transactions (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES auth.users(id),
-  book_copy_id BIGINT NOT NULL REFERENCES public.book_copies(id),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  book_copy_id BIGINT NOT NULL REFERENCES public.book_copies(id) ON DELETE CASCADE,
   issue_date TIMESTAMP NOT NULL DEFAULT NOW(),
   due_date TIMESTAMP NOT NULL,
   return_date TIMESTAMP,
@@ -110,8 +110,8 @@ CREATE TABLE IF NOT EXISTS public.transactions (
 
 CREATE TABLE IF NOT EXISTS public.reservations (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES auth.users(id),
-  book_id BIGINT NOT NULL REFERENCES public.books(id),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  book_id BIGINT NOT NULL REFERENCES public.books(id) ON DELETE CASCADE,
   status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'approved', 'cancelled', 'completed')),
   queue_position INT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -134,8 +134,8 @@ CREATE TABLE IF NOT EXISTS public.return_requests (
 -- -------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.fines (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES auth.users(id),
-  transaction_id BIGINT NOT NULL REFERENCES public.transactions(id),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  transaction_id BIGINT NOT NULL REFERENCES public.transactions(id) ON DELETE CASCADE,
   amount INT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid')),
   paid_at TIMESTAMP,
@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS public.fines (
 
 CREATE TABLE IF NOT EXISTS public.payments (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES auth.users(id),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   fine_id BIGINT NOT NULL REFERENCES public.fines(id) ON DELETE CASCADE,
   amount INT NOT NULL,
   provider TEXT NOT NULL DEFAULT 'razorpay',
@@ -166,11 +166,12 @@ CREATE TABLE IF NOT EXISTS public.system_settings (
   max_books_per_user INT NOT NULL DEFAULT 3,
   max_days_allowed INT NOT NULL DEFAULT 14,
   fine_per_day INT NOT NULL DEFAULT 5,
+  max_hold_minutes INT DEFAULT 5,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO public.system_settings (max_books_per_user, max_days_allowed, fine_per_day)
-SELECT 3, 14, 5
+INSERT INTO public.system_settings (max_books_per_user, max_days_allowed, fine_per_day, max_hold_minutes)
+SELECT 3, 14, 5, 5
 WHERE NOT EXISTS (SELECT 1 FROM public.system_settings);
 
 -- -------------------------------------------------------------
@@ -178,7 +179,7 @@ WHERE NOT EXISTS (SELECT 1 FROM public.system_settings);
 -- -------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.notifications (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES auth.users(id),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   type TEXT CHECK (type IN ('due_reminder', 'fine_alert', 'payment_success', 'reservation_update')),
   message TEXT NOT NULL,
   is_read BOOLEAN NOT NULL DEFAULT FALSE,
@@ -337,6 +338,72 @@ BEFORE INSERT OR UPDATE ON public.transactions
 FOR EACH ROW
 EXECUTE FUNCTION public.normalize_transaction_status();
 
+-- Compute dynamic fine using the latest system settings.
+CREATE OR REPLACE FUNCTION public.calculate_fine(p_transaction_id BIGINT)
+RETURNS INT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_due_date TIMESTAMP;
+  v_now TIMESTAMP := NOW();
+  v_days_overdue INT := 0;
+  v_fine_per_day INT;
+BEGIN
+  SELECT t.due_date INTO v_due_date
+  FROM public.transactions t
+  WHERE t.id = p_transaction_id;
+
+  IF v_due_date IS NULL THEN
+    RETURN 0;
+  END IF;
+
+  SELECT s.fine_per_day INTO v_fine_per_day
+  FROM public.system_settings s
+  ORDER BY s.id DESC
+  LIMIT 1;
+
+  IF v_now <= v_due_date THEN
+    RETURN 0;
+  END IF;
+
+  v_days_overdue := CEIL(EXTRACT(EPOCH FROM (v_now - v_due_date)) / 86400);
+  RETURN v_days_overdue * COALESCE(v_fine_per_day, 0);
+END;
+$$;
+
+-- Set due_date from system settings at issue creation time.
+CREATE OR REPLACE FUNCTION public.set_due_date()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_days INT;
+  v_minutes INT;
+BEGIN
+  SELECT s.max_days_allowed, s.max_hold_minutes
+  INTO v_days, v_minutes
+  FROM public.system_settings s
+  ORDER BY s.id DESC
+  LIMIT 1;
+
+  NEW.issue_date := COALESCE(NEW.issue_date, NOW());
+
+  IF v_minutes IS NOT NULL THEN
+    NEW.due_date := NEW.issue_date + (v_minutes || ' minutes')::INTERVAL;
+  ELSE
+    NEW.due_date := NEW.issue_date + (v_days || ' days')::INTERVAL;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_set_due_date ON public.transactions;
+CREATE TRIGGER trg_set_due_date
+BEFORE INSERT ON public.transactions
+FOR EACH ROW
+EXECUTE FUNCTION public.set_due_date();
+
 -- Enforce issuance rules:
 --   1) no new issue if user has an open overdue
 --   2) no duplicate active copy of same book for same user
@@ -346,6 +413,7 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
   v_book_id BIGINT;
+  v_max_books INT;
 BEGIN
   SELECT bc.book_id
   INTO v_book_id
@@ -354,6 +422,21 @@ BEGIN
 
   IF v_book_id IS NULL THEN
     RAISE EXCEPTION 'Invalid book_copy_id: %', NEW.book_copy_id;
+  END IF;
+
+  SELECT s.max_books_per_user INTO v_max_books
+  FROM public.system_settings s
+  ORDER BY s.id DESC
+  LIMIT 1;
+
+  IF (
+    SELECT COUNT(*)
+    FROM public.transactions t
+    WHERE t.user_id = NEW.user_id
+      AND t.return_date IS NULL
+      AND (TG_OP = 'INSERT' OR t.id <> NEW.id)
+  ) >= COALESCE(v_max_books, 3) THEN
+    RAISE EXCEPTION 'User % reached max limit of % books', NEW.user_id, COALESCE(v_max_books, 3);
   END IF;
 
   IF EXISTS (
@@ -439,12 +522,28 @@ AFTER INSERT OR UPDATE OR DELETE ON public.transactions
 FOR EACH ROW
 EXECUTE FUNCTION public.sync_book_copy_status_from_transactions();
 
--- Block reservation if user already holds an active issued copy of same book.
+-- Block reservation when user reached max active books or already holds same title.
 CREATE OR REPLACE FUNCTION public.validate_reservation_no_active_issue()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
+DECLARE
+  v_max_books INT;
 BEGIN
+  SELECT s.max_books_per_user INTO v_max_books
+  FROM public.system_settings s
+  ORDER BY s.id DESC
+  LIMIT 1;
+
+  IF (
+    SELECT COUNT(*)
+    FROM public.transactions t
+    WHERE t.user_id = NEW.user_id
+      AND t.return_date IS NULL
+  ) >= COALESCE(v_max_books, 3) THEN
+    RAISE EXCEPTION 'User % reached max book limit, cannot reserve', NEW.user_id;
+  END IF;
+
   IF EXISTS (
     SELECT 1
     FROM public.transactions t
@@ -584,6 +683,7 @@ $$;
 ALTER TABLE public.books ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.book_copies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fines ENABLE ROW LEVEL SECURITY;
@@ -594,6 +694,23 @@ ALTER TABLE public.ai_queries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.return_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bookmarks ENABLE ROW LEVEL SECURITY;
+
+-- profiles
+DROP POLICY IF EXISTS profiles_select_own ON public.profiles;
+CREATE POLICY profiles_select_own ON public.profiles
+FOR SELECT TO authenticated
+USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS profiles_update_own ON public.profiles;
+CREATE POLICY profiles_update_own ON public.profiles
+FOR UPDATE TO authenticated
+USING (auth.uid() = id)
+WITH CHECK (auth.uid() = id);
+
+DROP POLICY IF EXISTS profiles_insert_self ON public.profiles;
+CREATE POLICY profiles_insert_self ON public.profiles
+FOR INSERT TO authenticated
+WITH CHECK (auth.uid() = id);
 
 -- books
 DROP POLICY IF EXISTS books_read ON public.books;

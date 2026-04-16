@@ -1,4 +1,5 @@
 import type { MyBookIssue, MyBookIssueRow, MyBooksStats } from "@/components/dashboard/user/my-books/types";
+import { dbTimestampToEpochMs, formatDbTimestampIST } from "@/lib/dateTime";
 
 function pickOne<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
@@ -41,7 +42,7 @@ export function getIssueVisualStatus(issue: MyBookIssue): "issued" | "returned" 
   if (issue.returnDate) return "returned";
 
   const now = Date.now();
-  const due = issue.dueDate ? new Date(issue.dueDate).getTime() : null;
+  const due = dbTimestampToEpochMs(issue.dueDate);
   if (issue.status === "overdue") return "overdue";
   if (due && due < now) return "overdue";
 
@@ -52,7 +53,8 @@ export function getDaysLabel(issue: MyBookIssue): string {
   if (!issue.dueDate) return "No due date";
   if (issue.returnDate) return "Returned";
 
-  const due = new Date(issue.dueDate).getTime();
+  const due = dbTimestampToEpochMs(issue.dueDate) ?? Number.NaN;
+  if (!Number.isFinite(due)) return "No due date";
   const now = Date.now();
   const diffDays = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
 
@@ -62,16 +64,7 @@ export function getDaysLabel(issue: MyBookIssue): string {
 }
 
 export function formatDate(date: string | null): string {
-  if (!date) return "-";
-  try {
-    return new Date(date).toLocaleString("en-IN", {
-      timeZone: "Asia/Kolkata",
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
-  } catch {
-    return new Date(date).toLocaleDateString();
-  }
+  return formatDbTimestampIST(date);
 }
 
 export function formatCurrency(amount: number | string | null | undefined): string {

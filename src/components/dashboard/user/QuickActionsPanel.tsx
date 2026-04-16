@@ -24,6 +24,16 @@ export default function QuickActionsPanel() {
       const userId = userData?.session?.user?.id;
       if (!userId || !mounted) return;
 
+      const token = userData.session?.access_token;
+      if (token) {
+        await fetch("/api/library/fines", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {
+          // Best-effort sync only.
+        });
+      }
+
       const [activeBooksRes, unpaidFinesRes] = await Promise.all([
         supabase
           .from("transactions")

@@ -158,6 +158,18 @@ export default function UserMyBooksSection() {
     if (!currentUserId) return;
 
     try {
+      // Trigger fine sync so dashboard stats and fine-due card stay in sync with DB rules.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (token) {
+        await fetch("/api/library/fines", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+
       const [issuedRes, overdueRes, returnedRes, finesSumRes, txFinesRes] = await Promise.all([
         supabase.from("transactions").select("id", { count: "exact", head: true }).eq("user_id", currentUserId).eq("status", "issued"),
         supabase.from("transactions").select("id", { count: "exact", head: true }).eq("user_id", currentUserId).eq("status", "overdue"),

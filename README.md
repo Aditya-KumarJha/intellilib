@@ -655,4 +655,4 @@ npm run lint
 
 ## License
 
-MIT (see `LICENSE`).
+MIT (see [LICENSE](LICENSE)).
