@@ -1,6 +1,5 @@
 import PanelCard from "@/components/dashboard/admin/PanelCard";
 import supabaseAdmin from "@/lib/supabaseServerClient";
-import AuditLogEntry from "./AuditLogEntry";
 import AuditLogSectionClient from "./AuditLogSectionClient";
 
 export default async function AuditLogSection() {

@@ -1,5 +1,6 @@
 import DashboardStatCard from "@/components/dashboard/DashboardStatCard";
 import type { CirculationSummary } from "@/lib/server/librarianCirculation";
+import * as Icons from "lucide-react";
 
 type Props = {
   summary: CirculationSummary;
@@ -11,28 +12,28 @@ export default function CirculationStatsRow({ summary }: Props) {
       label: "Issued Today",
       value: String(summary.issuedToday),
       hint: "Desk issues processed today",
-      icon: "BookOpen",
+      icon: "BookOpen" as keyof typeof Icons,
       tone: "violet" as const,
     },
     {
       label: "Returns Today",
       value: String(summary.returnedToday),
       hint: "Completed and synced",
-      icon: "RotateCcw",
+      icon: "RotateCcw" as keyof typeof Icons,
       tone: "cyan" as const,
     },
     {
       label: "Pending Return Requests",
       value: String(summary.pendingReturns),
       hint: "Awaiting librarian approval",
-      icon: "ClipboardList",
+      icon: "ClipboardList" as keyof typeof Icons,
       tone: "amber" as const,
     },
     {
       label: "Open Overdue",
       value: String(summary.overdueOpen),
       hint: `${summary.availablePhysicalCopies} physical copies available now`,
-      icon: "AlertTriangle",
+      icon: "AlertTriangle" as keyof typeof Icons,
       tone: "rose" as const,
     },
   ];

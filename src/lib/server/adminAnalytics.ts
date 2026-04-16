@@ -120,7 +120,7 @@ export async function getRecentTransactions(limit = 20) {
 
   return transactions.map((transaction) => {
     const copy = copyMap.get(transaction.book_copy_id ?? -1) ?? null;
-    const book = copy ? bookMap.get(copy.book_id) : null;
+    const book = copy?.book_id != null ? bookMap.get(copy.book_id) ?? null : null;
     const profile = transaction.user_id ? profileMap.get(transaction.user_id) ?? null : null;
     return {
       ...transaction,

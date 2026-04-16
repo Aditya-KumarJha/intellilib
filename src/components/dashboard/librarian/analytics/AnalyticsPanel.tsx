@@ -1,7 +1,7 @@
 import PanelCard from "@/components/dashboard/admin/PanelCard";
 import DashboardStatCard from "@/components/dashboard/DashboardStatCard";
 import { getLibraryOverviewStats } from "@/lib/server/adminAnalytics";
-import { Book, Clock, FileText, Wind } from "lucide-react";
+import * as Icons from "lucide-react";
 
 export default async function AnalyticsPanel() {
   const stats = await getLibraryOverviewStats();
@@ -11,28 +11,28 @@ export default async function AnalyticsPanel() {
       label: "Total Books",
       value: String(stats.totalBooks),
       hint: `${stats.totalCopies} copies | ${stats.availableCopies} available`,
-      icon: "Book",
+      icon: "Book" as keyof typeof Icons,
       tone: "violet" as const,
     },
     {
       label: "Currently Issued",
       value: String(stats.issuedCount),
       hint: `${stats.overdueCount} overdue`,
-      icon: "FileText",
+      icon: "FileText" as keyof typeof Icons,
       tone: "amber" as const,
     },
     {
       label: "Waiting Reservations",
       value: String(stats.waitingReservations),
       hint: "Users in queue",
-      icon: "Wind",
+      icon: "Wind" as keyof typeof Icons,
       tone: "cyan" as const,
     },
     {
       label: "Outstanding Fines",
       value: `INR ${Math.round(stats.unpaidFineTotal)}`,
       hint: "Collect at desk or online",
-      icon: "Clock",
+      icon: "Clock" as keyof typeof Icons,
       tone: "emerald" as const,
     },
   ];

@@ -1,5 +1,6 @@
 import DashboardStatCard from "@/components/dashboard/DashboardStatCard";
 import type { Member } from "@/lib/server/members";
+import * as Icons from "lucide-react";
 
 type Props = {
   members: Member[];
@@ -31,28 +32,28 @@ export default function MembersStatsRow({ members }: Props) {
       label: "Total Members",
       value: String(summary.total),
       hint: `${summary.staff} staff accounts`,
-      icon: "Users",
+      icon: "Users" as keyof typeof Icons,
       tone: "violet" as const,
     },
     {
       label: "Active Accounts",
       value: String(summary.active),
       hint: "Can issue and reserve",
-      icon: "UserCheck",
+      icon: "UserCheck" as keyof typeof Icons,
       tone: "emerald" as const,
     },
     {
       label: "Suspended",
       value: String(summary.suspended),
       hint: "Restricted activity",
-      icon: "ShieldAlert",
+      icon: "ShieldAlert" as keyof typeof Icons,
       tone: "rose" as const,
     },
     {
       label: "New This Month",
       value: String(summary.newThisMonth),
       hint: "Fresh registrations",
-      icon: "UserPlus",
+      icon: "UserPlus" as keyof typeof Icons,
       tone: "cyan" as const,
     },
   ];

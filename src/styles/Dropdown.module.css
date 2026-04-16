@@ -2,9 +2,10 @@
   /* Light mode default */
   position: relative;
   display: flex;
+  align-items: center;
   width: 100%;
-  height: 3em;
-  line-height: 3;
+  height: 3rem;
+  line-height: 3rem;
   background: #ffffff;
   overflow: hidden;
   border-radius: 0.75rem;
@@ -23,6 +24,9 @@
   background-image: none;
   flex: 1;
   padding: 0 0.75em;
+  display: flex;
+  align-items: center;
+  height: 100%;
   color: #0f172a;
   cursor: pointer;
   font-size: 0.92rem;

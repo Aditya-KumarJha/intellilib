@@ -111,6 +111,15 @@ export default function PublicSearchClient() {
     setSubmittedQuery(query.trim());
   }, [query]);
 
+  // Auto-submit search when `query` changes, debounced to avoid excessive requests
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setSubmittedQuery(query.trim());
+    }, 300);
+
+    return () => clearTimeout(id);
+  }, [query]);
+
   const handleSuggestionPick = useCallback((value: string) => {
     setQuery(value);
     setSubmittedQuery(value.trim());

@@ -15,7 +15,7 @@ export type AuditRow = {
   created_at?: string | null;
 };
 
-function prettyMetadata(metadata: AuditMetadata): Record<string, unknown> | string | null {
+function prettyMetadata(metadata: AuditMetadata | undefined): Record<string, unknown> | string | null {
   if (!metadata) return null;
   if (typeof metadata === "string") {
     try {
