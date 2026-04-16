@@ -9,6 +9,7 @@ export type UserRole = "admin" | "librarian" | "user";
 type AuthState = {
   user: AuthUser | null;
   role: UserRole | null;
+  isAuthLoading: boolean;
   isRoleLoading: boolean;
   isAuthenticated: boolean;
   isInitialized: boolean;
@@ -20,22 +21,35 @@ type AuthState = {
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   role: null,
+  isAuthLoading: true,
   isRoleLoading: false,
   isAuthenticated: false,
   isInitialized: false,
   setUser: (u) => set({ user: u, isAuthenticated: !!u }),
   clearUser: () =>
-    set({ user: null, role: null, isAuthenticated: false, isRoleLoading: false }),
+    set({
+      user: null,
+      role: null,
+      isAuthenticated: false,
+      isRoleLoading: false,
+      isAuthLoading: false,
+    }),
   init: () => {
     if (get().isInitialized) {
       return;
     }
 
-    set({ isInitialized: true });
+    set({ isAuthLoading: true });
 
     const hydrateUser = async (authUser: AuthUser | null) => {
       if (!authUser) {
-        set({ user: null, role: null, isAuthenticated: false, isRoleLoading: false });
+        set({
+          user: null,
+          role: null,
+          isAuthenticated: false,
+          isRoleLoading: false,
+          isAuthLoading: false,
+        });
         return;
       }
 
@@ -49,14 +63,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           .single();
 
         if (error) {
-          set({ role: "user", isRoleLoading: false });
+          set({ role: "user", isRoleLoading: false, isAuthLoading: false });
           return;
         }
 
         const role = (data?.role ?? "user") as UserRole;
-        set({ role, isRoleLoading: false });
+        set({ role, isRoleLoading: false, isAuthLoading: false });
       } catch {
-        set({ role: "user", isRoleLoading: false });
+        set({ role: "user", isRoleLoading: false, isAuthLoading: false });
       }
     };
 
@@ -73,7 +87,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const authUser = toAuthUser(data?.session?.user ?? null);
         await hydrateUser(authUser);
       } catch {
-        // ignore
+        set({ isAuthLoading: false });
+      } finally {
+        set({ isInitialized: true });
       }
     })();
   },

@@ -7,7 +7,7 @@ import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "react-toastify";
 import Link from "next/link";
-import { isEmailVerified } from "@/lib/authUser";
+import { isEmailVerified, toAuthUser } from "@/lib/authUser";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { useMutation } from "@tanstack/react-query";
 
@@ -71,6 +71,36 @@ export default function LoginForm({
       toast.error(message);
     },
   });
+
+  useEffect(() => {
+    let mounted = true;
+
+    const forwardAuthenticatedUser = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+
+      const authUser = toAuthUser(data?.session?.user ?? null);
+      if (authUser) {
+        router.replace("/dashboard");
+      }
+    };
+
+    void forwardAuthenticatedUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const authUser = toAuthUser(session?.user ?? null);
+      if (authUser) {
+        router.replace("/dashboard");
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [router]);
 
   useEffect(() => {
     const error = searchParams?.get("error");

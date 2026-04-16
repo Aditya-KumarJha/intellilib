@@ -21,7 +21,6 @@ const NAV_ITEMS: NavItem[] = [
   { id: "home", label: "Home", icon: Home, href: "/" },
   { id: "search", label: "Search", icon: Search, href: "/search" },
   { id: "discover", label: "Discover", icon: Compass, href: "/discover" },
-  { id: "library", label: "Library Info", icon: Info, href: "/library" },
   { id: "contact", label: "Contact", icon: Mail, href: "/#contact" },
 ];
 

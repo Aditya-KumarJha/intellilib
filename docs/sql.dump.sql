@@ -97,12 +97,12 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   book_copy_id BIGINT NOT NULL REFERENCES public.book_copies(id) ON DELETE CASCADE,
-  issue_date TIMESTAMP NOT NULL DEFAULT NOW(),
-  due_date TIMESTAMP NOT NULL,
-  return_date TIMESTAMP,
+  issue_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  due_date TIMESTAMPTZ NOT NULL,
+  return_date TIMESTAMPTZ,
   status TEXT NOT NULL DEFAULT 'issued' CHECK (status IN ('issued', 'returned', 'overdue')),
   fine_amount INT NOT NULL DEFAULT 0,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT check_due_date CHECK (due_date >= issue_date),
   CONSTRAINT check_dates CHECK (return_date IS NULL OR return_date >= issue_date),
   CONSTRAINT check_transactions_fine_non_negative CHECK (fine_amount >= 0)
@@ -138,8 +138,8 @@ CREATE TABLE IF NOT EXISTS public.fines (
   transaction_id BIGINT NOT NULL REFERENCES public.transactions(id) ON DELETE CASCADE,
   amount INT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid')),
-  paid_at TIMESTAMP,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  paid_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT check_fines_amount_positive CHECK (amount > 0)
 );
 
@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
   bank TEXT,
   wallet TEXT,
   vpa TEXT,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT check_payments_amount_positive CHECK (amount > 0)
 );
 
@@ -166,12 +166,12 @@ CREATE TABLE IF NOT EXISTS public.system_settings (
   max_books_per_user INT NOT NULL DEFAULT 3,
   max_days_allowed INT NOT NULL DEFAULT 14,
   fine_per_day INT NOT NULL DEFAULT 5,
-  max_hold_minutes INT DEFAULT 5,
+  max_hold_minutes INT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 INSERT INTO public.system_settings (max_books_per_user, max_days_allowed, fine_per_day, max_hold_minutes)
-SELECT 3, 14, 5, 5
+SELECT 3, 14, 5, NULL
 WHERE NOT EXISTS (SELECT 1 FROM public.system_settings);
 
 -- -------------------------------------------------------------
@@ -344,10 +344,10 @@ RETURNS INT
 LANGUAGE plpgsql
 AS $$
 DECLARE
-  v_due_date TIMESTAMP;
-  v_now TIMESTAMP := NOW();
+  v_due_date TIMESTAMPTZ;
+  v_now TIMESTAMPTZ := NOW();
   v_days_overdue INT := 0;
-  v_fine_per_day INT;
+  v_fine_per_day INT := 5;
 BEGIN
   SELECT t.due_date INTO v_due_date
   FROM public.transactions t
@@ -366,8 +366,8 @@ BEGIN
     RETURN 0;
   END IF;
 
-  v_days_overdue := CEIL(EXTRACT(EPOCH FROM (v_now - v_due_date)) / 86400);
-  RETURN v_days_overdue * COALESCE(v_fine_per_day, 0);
+  v_days_overdue := CEIL(EXTRACT(EPOCH FROM (v_now - v_due_date)) / 86400.0);
+  RETURN GREATEST(1, v_days_overdue) * GREATEST(1, v_fine_per_day);
 END;
 $$;
 

@@ -10,7 +10,7 @@ import useAuthStore from "@/lib/authStore";
 
 export default function DashboardIndexPage() {
   const router = useRouter();
-  const { init, isAuthenticated, isRoleLoading, role } = useAuthStore();
+  const { init, isAuthenticated, isRoleLoading, isAuthLoading, isInitialized, role } = useAuthStore();
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -34,14 +34,14 @@ export default function DashboardIndexPage() {
   });
 
   useEffect(() => {
-    if (isRoleLoading) return;
+    if (!isInitialized || isAuthLoading || isRoleLoading) return;
     if (!isAuthenticated) {
       router.replace("/login");
       return;
     }
     const target = role ?? "user";
     router.replace(`/dashboard/${target}`);
-  }, [isAuthenticated, isRoleLoading, role, router]);
+  }, [isAuthenticated, isRoleLoading, isAuthLoading, isInitialized, role, router]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-(--page-bg) px-4 text-foreground">

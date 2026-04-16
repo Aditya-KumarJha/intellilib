@@ -113,7 +113,7 @@ export default function PublicBookDetailPage({ id }: { id: string }) {
           <div className="flex flex-col md:flex-row gap-10">
             {/* Book Cover */}
             <div className="w-full md:w-1/3 lg:w-1/4 shrink-0">
-              <div className="aspect-[2/3] overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-800 shadow-md flex items-center justify-center">
+              <div className="aspect-2/3 overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-800 shadow-md flex items-center justify-center">
                 {book.coverUrl ? (
                   <img src={book.coverUrl} alt={book.title} className="w-full h-full object-cover" />
                 ) : (
@@ -183,7 +183,7 @@ export default function PublicBookDetailPage({ id }: { id: string }) {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {related.map((rel) => (
                 <Link key={rel.id} href={`/search/${rel.id}`} className="group cursor-pointer">
-                  <div className="aspect-[2/3] overflow-hidden rounded-xl bg-zinc-200 dark:bg-zinc-800 shadow-sm mb-3">
+                  <div className="aspect-2/3 overflow-hidden rounded-xl bg-zinc-200 dark:bg-zinc-800 shadow-sm mb-3">
                     {rel.cover_url ? (
                       <img src={rel.cover_url} alt={rel.title} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                     ) : (

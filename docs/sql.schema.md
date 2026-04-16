@@ -48,23 +48,133 @@ For one-shot clean setup SQL, see `docs/sql.dump.sql`.
 
 ```mermaid
 erDiagram
-  AUTH_USERS ||--|| PROFILES : has
+  AUTH_USERS ||--|| PROFILES : has_profile
+
   CATEGORIES ||--o{ BOOKS : classifies
-  BOOKS ||--o{ BOOK_COPIES : contains
+  BOOKS ||--o{ BOOK_COPIES : has_copies
+
   AUTH_USERS ||--o{ TRANSACTIONS : borrows
   BOOK_COPIES ||--o{ TRANSACTIONS : issued_in
   TRANSACTIONS ||--|| FINES : may_generate
   AUTH_USERS ||--o{ FINES : owes
-  FINES ||--o{ PAYMENTS : paid_by
+  FINES ||--o{ PAYMENTS : paid_with
   AUTH_USERS ||--o{ PAYMENTS : makes
-  AUTH_USERS ||--o{ NOTIFICATIONS : receives
+
   AUTH_USERS ||--o{ RESERVATIONS : creates
   BOOKS ||--o{ RESERVATIONS : queued_for
+
   TRANSACTIONS ||--o{ RETURN_REQUESTS : return_flow
   AUTH_USERS ||--o{ RETURN_REQUESTS : requests
   AUTH_USERS ||--o{ RETURN_REQUESTS : processes
+
+  AUTH_USERS ||--o{ NOTIFICATIONS : receives
   AUTH_USERS ||--o{ BOOKMARKS : saves
   BOOKS ||--o{ BOOKMARKS : bookmarked
+  AUTH_USERS ||--o{ AI_QUERIES : submits
+
+  AUTH_USERS o|--o{ AUDIT_LOGS : actor
+
+  SYSTEM_SETTINGS {
+    bigint id PK
+    int max_books_per_user
+    int max_days_allowed
+    int fine_per_day
+    timestamp created_at
+  }
+
+  PROFILES {
+    uuid id PK,FK
+    text role
+    text status
+  }
+
+  CATEGORIES {
+    bigint id PK
+    text name
+  }
+
+  BOOKS {
+    bigint id PK
+    bigint category_id FK
+    text title
+    int total_copies
+    int available_copies
+  }
+
+  BOOK_COPIES {
+    bigint id PK
+    bigint book_id FK
+    text type
+    text status
+  }
+
+  TRANSACTIONS {
+    bigint id PK
+    uuid user_id FK
+    bigint book_copy_id FK
+    timestamp due_date
+    text status
+  }
+
+  RESERVATIONS {
+    bigint id PK
+    uuid user_id FK
+    bigint book_id FK
+    text status
+    int queue_position
+  }
+
+  RETURN_REQUESTS {
+    bigint id PK
+    bigint transaction_id FK
+    uuid user_id FK
+    uuid processed_by FK
+    text status
+  }
+
+  FINES {
+    bigint id PK
+    uuid user_id FK
+    bigint transaction_id FK
+    int amount
+    text status
+  }
+
+  PAYMENTS {
+    bigint id PK
+    uuid user_id FK
+    bigint fine_id FK
+    int amount
+    text status
+  }
+
+  NOTIFICATIONS {
+    bigint id PK
+    uuid user_id FK
+    text type
+    boolean is_read
+  }
+
+  BOOKMARKS {
+    bigint id PK
+    uuid user_id FK
+    bigint book_id FK
+  }
+
+  AI_QUERIES {
+    bigint id PK
+    uuid user_id FK
+    text query
+    timestamp created_at
+  }
+
+  AUDIT_LOGS {
+    bigint id PK
+    uuid user_id FK
+    text action
+    text entity
+    bigint entity_id
+  }
 ```
 
 ---
