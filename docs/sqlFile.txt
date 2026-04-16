@@ -1,3 +1,14 @@
+create table public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+
+  created_at timestamptz default now(),
+  full_name text,
+  role text default 'user',
+  avatar_url text,
+  status text default 'active'
+);
+
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql

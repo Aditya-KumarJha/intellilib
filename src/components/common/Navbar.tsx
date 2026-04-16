@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, type MouseEvent } from "react";
-import { Home, Search, Bot, Mail, UserPlus, LogIn, Menu, X, type LucideIcon } from "lucide-react";
+import { Home, Search, Bot, Mail, UserPlus, LogIn, Menu, X, Compass, Info, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import Button from "../ui/Button";
 import ThemeToggleButton from "../ui/theme-toggle-button";
@@ -20,7 +20,8 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { id: "home", label: "Home", icon: Home, href: "/#home" },
   { id: "search", label: "Search", icon: Search, href: "/search" },
-  { id: "assistant", label: "AI Assistant", icon: Bot, href: "/#ai-assistant" },
+  { id: "discover", label: "Discover", icon: Compass, href: "/discover" },
+  { id: "library", label: "Library Info", icon: Info, href: "/library" },
   { id: "contact", label: "Contact", icon: Mail, href: "/#contact" },
 ];
 

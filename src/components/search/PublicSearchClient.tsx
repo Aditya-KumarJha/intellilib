@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 import { supabase } from "@/lib/supabaseClient";
 import PublicBookCard from "@/components/search/PublicBookCard";
@@ -17,8 +18,11 @@ type SearchApiPayload = {
 };
 
 export default function PublicSearchClient() {
-  const [query, setQuery] = useState("");
-  const [submittedQuery, setSubmittedQuery] = useState("");
+  const searchParams = useSearchParams();
+  const initialQuery = searchParams?.get("q") ?? "";
+  
+  const [query, setQuery] = useState(initialQuery);
+  const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
   const [sortBy, setSortBy] = useState<PublicSearchSort>("relevance");
   const [books, setBooks] = useState<PublicBook[]>([]);
   const [bookmarkedIdSet, setBookmarkedIdSet] = useState<Set<number>>(new Set());
@@ -109,12 +113,26 @@ export default function PublicSearchClient() {
 
   const handleSubmit = useCallback(() => {
     setSubmittedQuery(query.trim());
+    const params = new URLSearchParams(window.location.search);
+    if (query.trim()) {
+      params.set("q", query.trim());
+    } else {
+      params.delete("q");
+    }
+    window.history.replaceState(null, "", "?" + params.toString());
   }, [query]);
 
   // Auto-submit search when `query` changes, debounced to avoid excessive requests
   useEffect(() => {
     const id = setTimeout(() => {
       setSubmittedQuery(query.trim());
+      const params = new URLSearchParams(window.location.search);
+      if (query.trim()) {
+        params.set("q", query.trim());
+      } else {
+        params.delete("q");
+      }
+      window.history.replaceState(null, "", "?" + params.toString());
     }, 300);
 
     return () => clearTimeout(id);
@@ -123,6 +141,13 @@ export default function PublicSearchClient() {
   const handleSuggestionPick = useCallback((value: string) => {
     setQuery(value);
     setSubmittedQuery(value.trim());
+    const params = new URLSearchParams(window.location.search);
+    if (value.trim()) {
+      params.set("q", value.trim());
+    } else {
+      params.delete("q");
+    }
+    window.history.replaceState(null, "", "?" + params.toString());
   }, []);
 
   const handleBookmarkChange = useCallback((bookId: number, nextBookmarked: boolean) => {
