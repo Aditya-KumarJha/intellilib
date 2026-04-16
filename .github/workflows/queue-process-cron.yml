@@ -8,9 +8,50 @@ on:
 jobs:
   process-queue:
     runs-on: ubuntu-latest
+    env:
+      QUEUE_PROCESS_ENDPOINT: ${{ secrets.QUEUE_PROCESS_ENDPOINT }}
+      RESERVATION_SCHEDULER_TOKEN: ${{ secrets.RESERVATION_SCHEDULER_TOKEN }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
     steps:
-      - name: Trigger queue processor endpoint
+      - name: Validate workflow secrets
+        shell: bash
         run: |
-          curl --fail --show-error --silent \
-            -X POST "${{ secrets.QUEUE_PROCESS_ENDPOINT }}" \
-            -H "x-scheduler-token: ${{ secrets.RESERVATION_SCHEDULER_TOKEN }}"
+          if [[ -z "$QUEUE_PROCESS_ENDPOINT" ]]; then
+            echo "::warning::QUEUE_PROCESS_ENDPOINT is not configured. Skipping run to avoid repeated failing emails."
+            exit 0
+          fi
+
+          if [[ -z "$RESERVATION_SCHEDULER_TOKEN" && -z "$CRON_SECRET" ]]; then
+            echo "::warning::Both RESERVATION_SCHEDULER_TOKEN and CRON_SECRET are empty. Endpoint will likely reject the request. Skipping run."
+            exit 0
+          fi
+
+      - name: Trigger queue processor endpoint
+        shell: bash
+        run: |
+          headers=(-H "content-type: application/json")
+
+          if [[ -n "$RESERVATION_SCHEDULER_TOKEN" ]]; then
+            headers+=( -H "x-scheduler-token: $RESERVATION_SCHEDULER_TOKEN" )
+          fi
+
+          if [[ -n "$CRON_SECRET" ]]; then
+            headers+=( -H "authorization: Bearer $CRON_SECRET" )
+          fi
+
+          response_file="$(mktemp)"
+          status_code=$(curl --silent --show-error \
+            --request POST \
+            --url "$QUEUE_PROCESS_ENDPOINT" \
+            "${headers[@]}" \
+            --output "$response_file" \
+            --write-out "%{http_code}")
+
+          if [[ "$status_code" -ge 400 ]]; then
+            echo "::error::Queue processor call failed with HTTP $status_code"
+            cat "$response_file"
+            exit 1
+          fi
+
+          echo "Queue processor call succeeded (HTTP $status_code)."
+          cat "$response_file"

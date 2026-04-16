@@ -191,7 +191,11 @@ export async function POST(req: Request) {
 
   if (insertError || !inserted) {
     const message = String(insertError?.message ?? "Could not create reservation");
-    const combined = `${message} ${String(insertError?.details ?? "")}`.toLowerCase();
+    const details =
+      insertError && typeof insertError === "object" && "details" in insertError
+        ? String(insertError.details ?? "")
+        : "";
+    const combined = `${message} ${details}`.toLowerCase();
 
     if (combined.includes("reached max book limit") || combined.includes("reached max limit") || combined.includes("max book limit")) {
       return NextResponse.json({ error: MAX_BOOKS_REACHED_MESSAGE }, { status: 409 });

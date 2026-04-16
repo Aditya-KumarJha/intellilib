@@ -545,6 +545,12 @@ Create `.env.local` for local development.
 - `RESERVATION_SCHEDULER_TOKEN`
 - `CRON_SECRET`
 
+### GitHub Actions (queue cron workflow)
+
+- `QUEUE_PROCESS_ENDPOINT` (for example: `https://<your-domain>/api/library/queue/process` or `https://<your-domain>/api/library/queue/process/cron`)
+- `RESERVATION_SCHEDULER_TOKEN` (required when using `/api/library/queue/process`)
+- `CRON_SECRET` (required when using `/api/library/queue/process/cron`)
+
 ### Optional integration
 
 - `IMAGEKIT_PRIVATE_KEY`
