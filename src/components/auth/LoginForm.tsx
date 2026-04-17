@@ -29,6 +29,7 @@ export default function LoginForm({
   const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({ email: false, password: false });
   const [serverError, setServerError] = useState<string | null>(null);
+  const [awaitingOtp, setAwaitingOtp] = useState(false);
   const router = useRouter();
 
   const loginMutation = useMutation({
@@ -66,6 +67,7 @@ export default function LoginForm({
       toast.success("Enter OTP from email.");
     },
     onError: (err) => {
+      setAwaitingOtp(false);
       const message = getErrorMessage(err, "Login failed");
       setServerError(message);
       toast.error(message);
@@ -80,7 +82,7 @@ export default function LoginForm({
       if (!mounted) return;
 
       const authUser = toAuthUser(data?.session?.user ?? null);
-      if (authUser) {
+      if (authUser && !awaitingOtp) {
         router.replace("/dashboard");
       }
     };
@@ -91,7 +93,7 @@ export default function LoginForm({
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       const authUser = toAuthUser(session?.user ?? null);
-      if (authUser) {
+      if (authUser && !awaitingOtp) {
         router.replace("/dashboard");
       }
     });
@@ -100,7 +102,7 @@ export default function LoginForm({
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, [awaitingOtp, router]);
 
   useEffect(() => {
     const error = searchParams?.get("error");
@@ -128,6 +130,7 @@ export default function LoginForm({
     setErrors(newErrors);
     if (Object.values(newErrors).some(Boolean)) return;
     setServerError(null);
+    setAwaitingOtp(true);
     loginMutation.mutate({ email: form.email, password: form.password });
   };
 
