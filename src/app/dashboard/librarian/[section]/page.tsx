@@ -1,20 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { getSectionMeta, isValidDashboardSection, getDashboardNav } from "@/lib/dashboardNav";
+import { getSectionMeta, isValidDashboardSection } from "@/lib/dashboardNav";
 import { buildMetadata } from "@/lib/seo";
 
 type PageProps = {
   params: Promise<{ section: string }>;
 };
 
-export function generateStaticParams() {
-  return getDashboardNav("librarian")
-    .filter((item) => item.segment !== null)
-    .map((item) => ({
-      section: item.segment as string,
-    }));
-}
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function generateMetadata({ params }: { params: Promise<{ section: string }> }): Promise<Metadata> {
   const { section } = await params;
