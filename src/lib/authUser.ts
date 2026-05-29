@@ -6,7 +6,13 @@ export type AuthUser = {
 };
 
 export function isEmailVerified(user: User | null | undefined) {
-  return Boolean(user?.email_confirmed_at);
+  if (!user) return false;
+  if (user.email_confirmed_at || user.confirmed_at) return true;
+
+  const provider = user.app_metadata?.provider;
+  if (provider && provider !== "email") return true;
+
+  return false;
 }
 
 export function toAuthUser(user: User | null | undefined): AuthUser | null {
